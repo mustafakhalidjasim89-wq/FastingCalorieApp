@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
+from PIL import Imagef
 from datetime import datetime, timedelta
 import re
 
@@ -144,7 +144,7 @@ if uploaded_image is not None:
                     5. **الحكم النهائي:** (ضع نصيحة صارمة ومباشرة للمستخدم).
                     """
 
-                    response = model.generateContent([prompt, image])
+                    response = model.generate_Content([prompt, image])
                     analysis_text = response.text
 
                     # استخراج عدد السعرات تلقائياً من النص باستخدام Regex
