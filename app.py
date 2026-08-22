@@ -5,26 +5,27 @@ from datetime import datetime, timedelta
 
 # 1. إعدادات الصفحة
 st.set_page_config(
-    page_title="حاسبة السعرات وحارس الصيام",
+    page_title="حارس التغذية والصيام المتقطع",
     page_icon="🔥",
     layout="centered"
 )
 
+# 2. العنوان والتوقيع الرئيسي
 st.title("🔥 حارس التغذية والصيام المتقطع")
+st.caption("Designed by: Mustafa Khalid Jasim")
 
-# 2. المفتاح المثبت تلقائياً
-API_KEY = "AQ.Ab8RN6LtXyeBL-q6uovDkpn1XCccKKhjrDniJxefItYhM56yFg"
+# 3. تثبيت مفتاح الـ API تلقائياً
+API_KEY = "ضع_مفتاح_GEMINI_الخاص_بك_هنا"
 
-if API_KEY and API_KEY != "ضع_مفتاح_GEMINI_الخاص_بك_هنا":
+if API_KEY and API_KEY != "AQ.Ab8RN6LtXyeBL-q6uovDkpn1XCccKKhjrDniJxefItYhM56yFg":
     genai.configure(api_key=API_KEY)
 else:
-    # خيار بديل في حال أردت إدخاله من القائمة الجانبية
     api_key_input = st.sidebar.text_input("أدخل Google Gemini API Key:", type="password")
     if api_key_input:
         genai.configure(api_key=api_key_input)
         API_KEY = api_key_input
 
-# 3. إدارة نظام الصيام المتقطع
+# 4. إعدادات القائمة الجانبية (الصيام المتقطع)
 st.sidebar.header("⏱️ نظام الصيام المتقطع")
 fasting_plan = st.sidebar.selectbox("اختر خطة الصيام (ساعة):", [12, 14, 16, 20])
 
@@ -43,7 +44,11 @@ with col2:
         st.session_state.fast_start_time = None
         st.warning("تم إنهاء الصيام.")
 
-# عرض حالة الصيام بدون غلق البرنامج
+# عرض حقوق التصميم في القائمة الجانبية
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Designed by:**\nMustafa Khalid Jasim")
+
+# عرض شريط متابعة الصيام المتقطع
 if st.session_state.fast_start_time:
     elapsed_time = datetime.now() - st.session_state.fast_start_time
     required_hours = timedelta(hours=fasting_plan)
@@ -56,23 +61,39 @@ if st.session_state.fast_start_time:
     else:
         st.success("🎉 انتهت فترة الصيام المتقطع!")
 
-# 4. تحليل الوجبة (مفتوح دائماً)
-st.subheader("📸 التقاط/رفع صورة الوجبة لتحليلها")
-uploaded_file = st.file_uploader("التقط صورة للوجبة عبر كاميرا الموبايل:", type=["jpg", "jpeg", "png"])
+st.markdown("---")
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption='الوجبة المرفوعة', use_container_width=True)
+# 5. اختيار طريقة إدخال صورة الوجبة (الكاميرا أو الاستوديو)
+st.subheader("📸 التقاط أو اختيار صورة الوجبة")
+
+input_method = st.radio(
+    "اختر مصدر الصورة:",
+    ["📷 الكاميرا المباشرة", "🖼️ اختيار من المعرض / الاستوديو"],
+    horizontal=True
+)
+
+uploaded_image = None
+
+if input_method == "📷 الكاميرا المباشرة":
+    uploaded_image = st.camera_input("التقط صورة للوجبة مباشرة:")
+else:
+    uploaded_image = st.file_uploader("اختر صورة الوجبة من الاستوديو:", type=["jpg", "jpeg", "png"])
+
+# 6. معالجة وتحليل الوجبة
+if uploaded_image is not None:
+    image = Image.open(uploaded_image)
+    if input_method == "🖼️ اختيار من المعرض / الاستوديو":
+        st.image(image, caption='الوجبة المختارة', use_container_width=True)
     
-    analyze_btn = st.button("تحليل الوجبة والسعرات 🔍")
+    analyze_btn = st.button("تحليل الوجبة والسعرات 🔍", type="primary")
 
     if analyze_btn:
         if not API_KEY or API_KEY == "ضع_مفتاح_GEMINI_الخاص_بك_هنا":
-            st.error("يرجى وضع المفتاح الخاص بك في الكود أو إدخاله من القائمة الجانبية!")
+            st.error("يرجى إدخال API Key الخاص بك أولاً في الكود أو القائمة الجانبية!")
         else:
             with st.spinner("جاري تحليل الوجبة وتقييم مخاطرها..."):
                 try:
-                    # تم التحديث لاستخدام اسم الموديل المعتمد لإنهاء خطأ 404
+                    # استخدام اسم الموديل المعتمد لتفادي خطأ 404
                     model = genai.GenerativeModel('models/gemini-1.5-flash')
                     
                     prompt = """
@@ -86,9 +107,14 @@ if uploaded_file is not None:
                     5. **الحكم النهائي:** (ضع نصيحة صارمة ومباشرة للمستخدم).
                     """
 
-                    response = model.generate_content([prompt, image])
+                    response = model.generateContent([prompt, image])
                     st.markdown("---")
+                    st.markdown("### 📊 التقرير والتحليل الغذائي:")
                     st.markdown(response.text)
 
                 except Exception as e:
                     st.error(f"حدث خطأ أثناء التحليل: {e}")
+
+# تذييل الصفحة السفلية
+st.markdown("---")
+st.markdown("<div style='text-align: center; color: gray;'>Designed by: Mustafa Khalid Jasim</div>", unsafe_allow_html=True)
