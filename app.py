@@ -26,6 +26,12 @@ else:
         genai.configure(api_key=api_key_input)
         API_KEY = api_key_input
 
+# دالة لتصغير حجم الصورة لسرعة معالجة استثنائية
+def optimize_image(img, max_size=800):
+    img = img.convert("RGB")
+    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+    return img
+
 # 4. إدارة الجلسة للسعرات والسجل اليومي
 if 'daily_target' not in st.session_state:
     st.session_state.daily_target = 2000
@@ -116,9 +122,11 @@ else:
 
 # 8. معالجة وتحليل الوجبة وإضافتها للسجل
 if uploaded_image is not None:
-    image = Image.open(uploaded_image)
+    raw_image = Image.open(uploaded_image)
+    optimized_img = optimize_image(raw_image) # ضغط وصقل الصورة لسرعة فائقة
+
     if input_method == "🖼️ اختيار من المعرض / الاستوديو":
-        st.image(image, caption='الوجبة المختارة', use_container_width=True)
+        st.image(optimized_img, caption='الوجبة المختارة', use_container_width=True)
     
     meal_name = st.text_input("اسم الوجبة (اختياري للتسجيل):", value="وجبة مسجلة")
     analyze_btn = st.button("تحليل الوجبة وإضافتها للسجل 🔍", type="primary")
@@ -127,25 +135,23 @@ if uploaded_image is not None:
         if not API_KEY or API_KEY == "ضع_مفتاح_GEMINI_الخاص_بك_هنا":
             st.error("يرجى إدخال API Key الخاص بك أولاً في الكود أو القائمة الجانبية!")
         else:
-            with st.spinner("جاري تحليل الوجبة وتقييم مخاطرها..."):
+            with st.spinner("جاري التحليل السريع للوجبة... ⚡"):
                 try:
-                    model = genai.GenerativeModel('models/gemini-1.5-flash')
+                    # الاعتماد على نموذج السرعة العالية
+                    model = genai.GenerativeModel('gemini-2.5-flash')
                     
                     prompt = """
-                    أنت خبير تغذية صارم جداً ولا تجامل على الإطلاق (Brutally Honest). 
-                    قم بتحليل الصورة التالية للوجبة وتقديم التقرير باللغة العربية بالصيغة التالية تماماً:
+                    أنت خبير تغذية صارم جداً ولا تجامل (Brutally Honest). 
+                    قم بتحليل صورة الوجبة المرفقة واكتب التقرير بشكل اختصار ومباشر دون إطالة وفق التالي:
 
-                    الإجمالي التقديري للسعرات: [اكتب الرقم الإجمالي للسعرات الحرارية هنا بالأرقام فقط ثم كلمة سعرة، مثال: 650 سعرة]
+                    الإجمالي التقديري للسعرات: [اكتب الرقم فقط ثم كلمة سعرة، مثال: 650 سعرة]
 
-                    1. **مكونات الوجبة:** (تحديد كل مكون بدقة)
-                    2. **السعرات الحرارية التقديرية:** (تقدير دقيق لكل مكون والإجمالي)
-                    3. **الماكروز (تخميني):** (البروتين، الكارب، الدهون)
-                    4. **المخاطر الصحية والتقييم الصارم:** (انتقد الوجبة بدون أي مجاملة، وضح التأثير على الوزن، نسبة السكر، والدهون، وهل تصلح للدايت أم لا).
-                    5. **الحكم النهائي:** (ضع نصيحة صارمة ومباشرة للمستخدم).
+                    1. **المكونات والسعرات:** (تقدير سريع بدقة)
+                    2. **الماكروز:** (بروتين/كارب/دهون)
+                    3. **النقد الصارم والحكم النهائي:** (مخاطر الوجبة ونصيحة حازمة بدون مجاملة في 3 أسطر فقط).
                     """
 
-                    # الإصلاح هنا: استخدام generate_content بدلاً من generateContent
-                    response = model.generate_content([prompt, image])
+                    response = model.generate_content([prompt, optimized_img])
                     analysis_text = response.text
 
                     # استخراج عدد السعرات تلقائياً
@@ -163,11 +169,16 @@ if uploaded_image is not None:
                     st.markdown("---")
                     st.markdown("### 📊 التقرير والتحليل الغذائي:")
                     st.markdown(analysis_text)
-                    st.success(f"✅ تم تسجيل الوجبة وتحديث الميزانية بخصم {extracted_calories} سعرة حرارية!")
-                    st.rerun()
+                    st.success(f"✅ تم التسجيل ورصد {extracted_calories} سعرة حرارية!")
 
                 except Exception as e:
-                    st.error(f"حدث خطأ أثناء التحليل: {e}")
+                    # الخيار الاحتياطي في حال عدم إتاحة النموذج في بعض المناطق
+                    try:
+                        model = genai.GenerativeModel('models/gemini-1.5-flash')
+                        response = model.generate_content([prompt, optimized_img])
+                        st.markdown(response.text)
+                    except Exception as fallback_err:
+                        st.error(f"حدث خطأ أثناء التحليل: {fallback_err}")
 
 # 9. عرض سجل الوجبات اليومية
 if st.session_state.meals_history:
