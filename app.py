@@ -16,7 +16,7 @@ st.title("🔥 حارس التغذية والصيام المتقطع")
 st.caption("Designed by: Mustafa Khalid Jasim")
 
 # 3. تثبيت مفتاح الـ API تلقائياً
-API_KEY = "ضع_مفتاح_GEMINI_الخاص_بك_هنا"
+API_KEY = "AQ.Ab8RN6LtXyeBL-q6uovDkpn1XCccKKhjrDniJxefItYhM56yFg"
 
 if API_KEY and API_KEY != "AQ.Ab8RN6LtXyeBL-q6uovDkpn1XCccKKhjrDniJxefItYhM56yFg":
     genai.configure(api_key=API_KEY)
