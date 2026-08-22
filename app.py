@@ -21,7 +21,7 @@ API_KEY = "AQ.Ab8RN6LtXyeBL-q6uovDkpn1XCccKKhjrDniJxefItYhM56yFg"
 if API_KEY and API_KEY != "AQ.Ab8RN6LtXyeBL-q6uovDkpn1XCccKKhjrDniJxefItYhM56yFg":
     genai.configure(api_key=API_KEY)
 else:
-    api_key_input = st.sidebar.text_input("أدخل Google Gemini API Key:", type="password")
+    api_key_input = st.sidebar.text_input("AQ.Ab8RN6LtXyeBL-q6uovDkpn1XCccKKhjrDniJxefItYhM56yFg", type="password")
     if api_key_input:
         genai.configure(api_key=api_key_input)
         API_KEY = api_key_input
