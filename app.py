@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Imagef
+from PIL import Image
 from datetime import datetime, timedelta
 import re
 
@@ -26,7 +26,7 @@ else:
         genai.configure(api_key=api_key_input)
         API_KEY = api_key_input
 
-# 4. إدارة الجلسة للسعرات والسجل اليومي (Session State Initialization)
+# 4. إدارة الجلسة للسعرات والسجل اليومي
 if 'daily_target' not in st.session_state:
     st.session_state.daily_target = 2000
 
@@ -69,7 +69,7 @@ if st.sidebar.button("🗑️ إعادة ضبط سجل اليوم"):
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Designed by:**\nMustafa Khalid Jasim")
 
-# 6. عرض لوحة متابعة السعرات والصيام في أعلى الصفحة
+# 6. عرض لوحة متابعة السعرات والصيام
 consumed_calories = sum(meal['calories'] for meal in st.session_state.meals_history)
 remaining_calories = st.session_state.daily_target - consumed_calories
 
@@ -144,10 +144,11 @@ if uploaded_image is not None:
                     5. **الحكم النهائي:** (ضع نصيحة صارمة ومباشرة للمستخدم).
                     """
 
-                    response = model.generate_Content([prompt, image])
+                    # الإصلاح هنا: استخدام generate_content بدلاً من generateContent
+                    response = model.generate_content([prompt, image])
                     analysis_text = response.text
 
-                    # استخراج عدد السعرات تلقائياً من النص باستخدام Regex
+                    # استخراج عدد السعرات تلقائياً
                     cal_match = re.search(r'الإجمالي التقديري للسعرات:\s*(\d+)', analysis_text)
                     extracted_calories = int(cal_match.group(1)) if cal_match else 0
 
