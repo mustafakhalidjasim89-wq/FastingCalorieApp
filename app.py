@@ -78,7 +78,7 @@ else:
             else:
                 with st.spinner("جاري تحليل الوجبة وتقييم مخاطرها..."):
                     try:
-                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        model = genai.GenerativeModel('gemini-2.5-flash')
                         
                         prompt = """
                         أنت خبير تغذية صارم جداً ولا تجامل على الإطلاق (Brutally Honest). 
