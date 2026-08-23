@@ -138,7 +138,7 @@ if uploaded_image is not None:
             with st.spinner("جاري التحليل السريع للوجبة... ⚡"):
                 try:
                     # الاعتماد على نموذج السرعة العالية
-                    model = genai.GenerativeModel('gemini-3.5-flash')
+                    model = genai.GenerativeModel('gemini-3.6-flash')
                     
                     prompt = """
                     أنت خبير تغذية صارم جداً ولا تجامل (Brutally Honest). 
