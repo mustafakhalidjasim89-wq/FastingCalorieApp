@@ -1,3 +1,4 @@
+
 import os
 import re
 from datetime import datetime, timedelta
@@ -156,7 +157,11 @@ if uploaded_image is not None:
         else:
             with st.spinner("جاري التحليل السريع للوجبة... ⚡"):
                 try:
-                    client = genai.Client(api_key=api_key)
+                    # Sanitize key and bind to system environment to avoid OAuth 401 errors
+                    clean_key = api_key.strip()
+                    os.environ["GEMINI_API_KEY"] = clean_key
+                    
+                    client = genai.Client()
                     
                     prompt = """
                     أنت خبير تغذية صارم جداً ولا تجامل (Brutally Honest). 
@@ -165,7 +170,7 @@ if uploaded_image is not None:
                     الإجمالي التقديري للسعرات: [اكتب الرقم فقط ثم كلمة سعرة، مثال: 650 سعرة]
 
                     1. **المكونات والسعرات:** (تقدير سريع بدقة)
-                    2. **المكونات:** (بروتين/كارب/دهون)
+                    2. **القيم الغذائية:** (البروتين/الكربوهيدرات/الدهون بالجرام تقريباً)
                     3. **النقد الصارم والحكم النهائي:** (مخاطر الوجبة ونصيحة حازمة بدون مجاملة في 3 أسطر فقط).
                     """
 
