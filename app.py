@@ -18,7 +18,7 @@ st.title("🔥 حارس التغذية والصيام المتقطع")
 st.caption("Designed by: Mustafa Khalid Jasim")
 
 # 3. إدارة وإدخال API Key بأمان
-st.sidebar.header("🔑 إعدادات المفتاح (API Key)")
+st.sidebar.header("🔑 إعدادات المفتاح (AQ.Ab8RN6JizY-2-MXKBwDXrauL8UoqT_HBOQlcdqVBJOELyvTjFw)")
 
 # محاولة جلب المفتاح من Secrets أولاً أو من المتغيرات البيئية
 api_key = st.secrets.get("AQ.Ab8RN6JizY-2-MXKBwDXrauL8UoqT_HBOQlcdqVBJOELyvTjFw") or os.environ.get("GEMINI_API_KEY")
