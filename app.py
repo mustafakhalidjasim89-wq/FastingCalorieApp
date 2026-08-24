@@ -25,7 +25,7 @@ api_key = st.secrets.get("AQ.Ab8RN6JizY-2-MXKBwDXrauL8UoqT_HBOQlcdqVBJOELyvTjFw"
 
 if not api_key:
     user_key_input = st.sidebar.text_input(
-        "أدخل Google Gemini API Key الخاص بك:", 
+        "AQ.Ab8RN6JizY-2-MXKBwDXrauL8UoqT_HBOQlcdqVBJOELyvTjFw:", 
         type="password",
         help="احصل على مفتاح مجاني من https://aistudio.google.com/"
     )
