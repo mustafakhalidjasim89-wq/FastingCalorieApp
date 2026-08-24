@@ -21,7 +21,7 @@ st.caption("Designed by: Mustafa Khalid Jasim")
 st.sidebar.header("🔑 إعدادات المفتاح (API Key)")
 
 # محاولة جلب المفتاح من Secrets أولاً أو من المتغيرات البيئية
-api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+api_key = st.secrets.get("AQ.Ab8RN6JizY-2-MXKBwDXrauL8UoqT_HBOQlcdqVBJOELyvTjFw") or os.environ.get("GEMINI_API_KEY")
 
 if not api_key:
     user_key_input = st.sidebar.text_input(
