@@ -1,4 +1,3 @@
-
 import os
 import re
 from datetime import datetime, timedelta
@@ -44,17 +43,17 @@ if 'fast_start_time' not in st.session_state:
 # ---------------------------------------------------------
 st.sidebar.header("🔑 إعدادات المفتاح (API Key)")
 
-# Resolve API Key from Streamlit Secrets or Environment Variables
-api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+# Read key from Streamlit Secrets or system environment
+raw_api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
 
-if not api_key:
-    user_key_input = st.sidebar.text_input(
-        "أدخل Google Gemini API Key:",
-        type="password",
-        help="احصل على مفتاح مجاني من https://aistudio.google.com/"
-    )
-    if user_key_input:
-        api_key = user_key_input.strip()
+user_key_input = st.sidebar.text_input(
+    "أدخل Google Gemini API Key:",
+    value=raw_api_key,
+    type="password",
+    help="احصل على مفتاح مجاني من https://aistudio.google.com/"
+)
+
+api_key = user_key_input.strip() if user_key_input else ""
 
 st.sidebar.markdown("---")
 st.sidebar.header("🎯 الهدف اليومي للسعرات")
@@ -157,11 +156,8 @@ if uploaded_image is not None:
         else:
             with st.spinner("جاري التحليل السريع للوجبة... ⚡"):
                 try:
-                    # Sanitize key and bind to system environment to avoid OAuth 401 errors
-                    clean_key = api_key.strip()
-                    os.environ["GEMINI_API_KEY"] = clean_key
-                    
-                    client = genai.Client()
+                    # Pass API Key explicitly to Client to prevent OAuth/Vertex fallback errors
+                    client = genai.Client(api_key=api_key)
                     
                     prompt = """
                     أنت خبير تغذية صارم جداً ولا تجامل (Brutally Honest). 
@@ -181,7 +177,7 @@ if uploaded_image is not None:
                     
                     analysis_text = response.text
 
-                    # Flexible regex pattern to capture numeric calories safely
+                    # Safe regex parsing for calories
                     cal_match = re.search(r'الإجمالي التقديري للسعرات:\s*(\d+)', analysis_text)
                     if not cal_match:
                         cal_match = re.search(r'(\d+)\s*سعرة', analysis_text)
