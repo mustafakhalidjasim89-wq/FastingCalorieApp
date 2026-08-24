@@ -1,44 +1,34 @@
-import streamlit as st
 import os
-from google import genai
-from google.genai import types
-from PIL import Image
-from datetime import datetime, timedelta
 import re
+from datetime import datetime, timedelta
+import streamlit as st
+from PIL import Image
+from google import genai
 
-# 1. إعدادات الصفحة
+# ---------------------------------------------------------
+# 1. Page Configuration & Layout
+# ---------------------------------------------------------
 st.set_page_config(
     page_title="حارس التغذية والصيام المتقطع",
     page_icon="🔥",
     layout="centered"
 )
 
-# 2. العنوان والتوقيع الرئيسي
 st.title("🔥 حارس التغذية والصيام المتقطع")
 st.caption("Designed by: Mustafa Khalid Jasim")
 
-# 3. إدارة وإدخال API Key بأمان
-st.sidebar.header("🔑 إعدادات المفتاح (AQ.Ab8RN6JizY-2-MXKBwDXrauL8UoqT_HBOQlcdqVBJOELyvTjFw)")
-
-# محاولة جلب المفتاح من Secrets أولاً أو من المتغيرات البيئية
-api_key = st.secrets.get("AQ.Ab8RN6JizY-2-MXKBwDXrauL8UoqT_HBOQlcdqVBJOELyvTjFw") or os.environ.get("GEMINI_API_KEY")
-
-if not api_key:
-    user_key_input = st.sidebar.text_input(
-        "AQ.Ab8RN6JizY-2-MXKBwDXrauL8UoqT_HBOQlcdqVBJOELyvTjFw:", 
-        type="password",
-        help="احصل على مفتاح مجاني من https://aistudio.google.com/"
-    )
-    if user_key_input:
-        api_key = user_key_input.strip()
-
-# دالة لتصغير حجم الصورة لسرعة معالجة استثنائية
+# ---------------------------------------------------------
+# 2. Helper Functions
+# ---------------------------------------------------------
 def optimize_image(img, max_size=800):
+    """Resize and compress image for faster AI vision processing."""
     img = img.convert("RGB")
     img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
     return img
 
-# 4. إدارة الجلسة للسعرات والسجل اليومي
+# ---------------------------------------------------------
+# 3. Session State Initialization
+# ---------------------------------------------------------
 if 'daily_target' not in st.session_state:
     st.session_state.daily_target = 2000
 
@@ -48,13 +38,30 @@ if 'meals_history' not in st.session_state:
 if 'fast_start_time' not in st.session_state:
     st.session_state.fast_start_time = None
 
-# 5. القائمة الجانبية: إعدادات الهدف اليومي والصيام المتقطع
+# ---------------------------------------------------------
+# 4. Sidebar: API Key & Intermittent Fasting Settings
+# ---------------------------------------------------------
+st.sidebar.header("🔑 إعدادات المفتاح (API Key)")
+
+# Resolve API Key from Streamlit Secrets or Environment Variables
+api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+
+if not api_key:
+    user_key_input = st.sidebar.text_input(
+        "أدخل Google Gemini API Key:",
+        type="password",
+        help="احصل على مفتاح مجاني من https://aistudio.google.com/"
+    )
+    if user_key_input:
+        api_key = user_key_input.strip()
+
+st.sidebar.markdown("---")
 st.sidebar.header("🎯 الهدف اليومي للسعرات")
 st.session_state.daily_target = st.sidebar.number_input(
-    "حدد حد السعرات اليومي (Kcal):", 
-    min_value=1000, 
-    max_value=5000, 
-    value=st.session_state.daily_target, 
+    "حدد حد السعرات اليومي (Kcal):",
+    min_value=1000,
+    max_value=5000,
+    value=st.session_state.daily_target,
     step=100
 )
 
@@ -62,13 +69,13 @@ st.sidebar.markdown("---")
 st.sidebar.header("⏱️ نظام الصيام المتقطع")
 fasting_plan = st.sidebar.selectbox("اختر خطة الصيام (ساعة):", [12, 14, 16, 20])
 
-col1, col2 = st.sidebar.columns(2)
-with col1:
+col_fast_start, col_fast_end = st.sidebar.columns(2)
+with col_fast_start:
     if st.button("بدء الصيام الآن"):
         st.session_state.fast_start_time = datetime.now()
         st.success("تم بدء الصيام!")
 
-with col2:
+with col_fast_end:
     if st.button("إنهاء الصيام"):
         st.session_state.fast_start_time = None
         st.warning("تم إنهاء الصيام.")
@@ -81,7 +88,9 @@ if st.sidebar.button("🗑️ إعادة ضبط سجل اليوم"):
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Designed by:**\nMustafa Khalid Jasim")
 
-# 6. عرض لوحة متابعة السعرات والصيام
+# ---------------------------------------------------------
+# 5. Dashboard Metrics & Fasting Timer
+# ---------------------------------------------------------
 consumed_calories = sum(meal['calories'] for meal in st.session_state.meals_history)
 remaining_calories = st.session_state.daily_target - consumed_calories
 
@@ -95,7 +104,7 @@ if remaining_calories >= 0:
 else:
     metric_col3.metric("تجاوزت الحد بـ", f"{abs(remaining_calories)} سعرة", delta=f"-{abs(remaining_calories)} Kcal", delta_color="inverse")
 
-# شريط حالة الصيام المتقطع
+# Fasting Timer Display
 if st.session_state.fast_start_time:
     elapsed_time = datetime.now() - st.session_state.fast_start_time
     required_hours = timedelta(hours=fasting_plan)
@@ -110,7 +119,9 @@ if st.session_state.fast_start_time:
 
 st.markdown("---")
 
-# 7. التقاط أو اختيار صورة الوجبة
+# ---------------------------------------------------------
+# 6. Image Acquisition
+# ---------------------------------------------------------
 st.subheader("📸 فحص وتسجيل وجبة جديدة")
 
 input_method = st.radio(
@@ -126,7 +137,9 @@ if input_method == "📷 الكاميرا المباشرة":
 else:
     uploaded_image = st.file_uploader("اختر صورة الوجبة من الاستوديو:", type=["jpg", "jpeg", "png"])
 
-# 8. معالجة وتحليل الوجبة وإضافتها للسجل
+# ---------------------------------------------------------
+# 7. AI Analysis Engine & Meal Logging
+# ---------------------------------------------------------
 if uploaded_image is not None:
     raw_image = Image.open(uploaded_image)
     optimized_img = optimize_image(raw_image)
@@ -143,12 +156,11 @@ if uploaded_image is not None:
         else:
             with st.spinner("جاري التحليل السريع للوجبة... ⚡"):
                 try:
-                    # إعداد الـ Client باستخدام المكتبة الجديدة الحديثة
                     client = genai.Client(api_key=api_key)
                     
                     prompt = """
                     أنت خبير تغذية صارم جداً ولا تجامل (Brutally Honest). 
-                    قم بتحليل صورة الوجبة المرفقة واكتب التقرير بشكل اختصار ومباشر دون إطالة وفق التالي:
+                    قم بتحليل صورة الوجبة المرفقة واكتب التقرير بشكل مختصر ومباشر دون إطالة وفق التالي:
 
                     الإجمالي التقديري للسعرات: [اكتب الرقم فقط ثم كلمة سعرة، مثال: 650 سعرة]
 
@@ -157,19 +169,20 @@ if uploaded_image is not None:
                     3. **النقد الصارم والحكم النهائي:** (مخاطر الوجبة ونصيحة حازمة بدون مجاملة في 3 أسطر فقط).
                     """
 
-                    # الاستدعاء الصحيح وفق google-genai
                     response = client.models.generate_content(
-                        model='gemini-2.0-flash',
+                        model='gemini-2.5-flash',
                         contents=[optimized_img, prompt]
                     )
                     
                     analysis_text = response.text
 
-                    # استخراج عدد السعرات تلقائياً
+                    # Flexible regex pattern to capture numeric calories safely
                     cal_match = re.search(r'الإجمالي التقديري للسعرات:\s*(\d+)', analysis_text)
+                    if not cal_match:
+                        cal_match = re.search(r'(\d+)\s*سعرة', analysis_text)
+                    
                     extracted_calories = int(cal_match.group(1)) if cal_match else 0
 
-                    # حفظ الوجبة في السجل اليومي
                     st.session_state.meals_history.append({
                         "time": datetime.now().strftime("%I:%M %p"),
                         "name": meal_name,
@@ -185,7 +198,9 @@ if uploaded_image is not None:
                 except Exception as e:
                     st.error(f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {e}")
 
-# 9. عرض سجل الوجبات اليومية
+# ---------------------------------------------------------
+# 8. Daily Meals Log
+# ---------------------------------------------------------
 if st.session_state.meals_history:
     st.markdown("---")
     st.subheader("📋 سجل الوجبات اليومية")
@@ -193,6 +208,8 @@ if st.session_state.meals_history:
         with st.expander(f"🍽️ {meal['name']} - {meal['calories']} سعرة ({meal['time']})"):
             st.markdown(meal['details'])
 
-# تذييل الصفحة السفلية
+# ---------------------------------------------------------
+# 9. Footer
+# ---------------------------------------------------------
 st.markdown("---")
 st.markdown("<div style='text-align: center; color: gray;'>Designed by: Mustafa Khalid Jasim</div>", unsafe_allow_html=True)
