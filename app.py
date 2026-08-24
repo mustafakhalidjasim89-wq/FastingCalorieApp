@@ -138,7 +138,7 @@ if uploaded_image is not None:
             with st.spinner("جاري التحليل السريع للوجبة... ⚡"):
                 try:
                     # الاعتماد على نموذج السرعة العالية
-                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    model = genai.GenerativeModel('gemini-3.5-flash')
                     
                     prompt = """
                     أنت خبير تغذية صارم جداً ولا تجامل (Brutally Honest). 
@@ -174,7 +174,7 @@ if uploaded_image is not None:
                 except Exception as e:
                     # الخيار الاحتياطي في حال عدم إتاحة النموذج في بعض المناطق
                     try:
-                        model = genai.GenerativeModel('models/gemini-2.5-flash')
+                        model = genai.GenerativeModel('models/gemini-3.5-flash')
                         response = model.generate_content([prompt, optimized_img])
                         st.markdown(response.text)
                     except Exception as fallback_err:
