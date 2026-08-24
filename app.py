@@ -1,5 +1,7 @@
 import streamlit as st
-import google.generativeai as genai
+import os
+from google import genai
+from google.genai import types
 from PIL import Image
 from datetime import datetime, timedelta
 import re
@@ -15,16 +17,20 @@ st.set_page_config(
 st.title("🔥 حارس التغذية والصيام المتقطع")
 st.caption("Designed by: Mustafa Khalid Jasim")
 
-# 3. تثبيت مفتاح الـ API تلقائياً
-API_KEY = "AQ.Ab8RN6LtXyeBL-q6uovDkpn1XCccKKhjrDniJxefItYhM56yFg"
+# 3. إدارة وإدخال API Key بأمان
+st.sidebar.header("🔑 إعدادات المفتاح (API Key)")
 
-if API_KEY and API_KEY != "AQ.Ab8RN6LtXyeBL-q6uovDkpn1XCccKKhjrDniJxefItYhM56yFg":
-    genai.configure(api_key=API_KEY)
-else:
-    api_key_input = st.sidebar.text_input("AQ.Ab8RN6LtXyeBL-q6uovDkpn1XCccKKhjrDniJxefItYhM56yFg", type="password")
-    if api_key_input:
-        genai.configure(api_key=api_key_input)
-        API_KEY = api_key_input
+# محاولة جلب المفتاح من Secrets أولاً أو من المتغيرات البيئية
+api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+
+if not api_key:
+    user_key_input = st.sidebar.text_input(
+        "أدخل Google Gemini API Key الخاص بك:", 
+        type="password",
+        help="احصل على مفتاح مجاني من https://aistudio.google.com/"
+    )
+    if user_key_input:
+        api_key = user_key_input.strip()
 
 # دالة لتصغير حجم الصورة لسرعة معالجة استثنائية
 def optimize_image(img, max_size=800):
@@ -123,7 +129,7 @@ else:
 # 8. معالجة وتحليل الوجبة وإضافتها للسجل
 if uploaded_image is not None:
     raw_image = Image.open(uploaded_image)
-    optimized_img = optimize_image(raw_image) # ضغط وصقل الصورة لسرعة فائقة
+    optimized_img = optimize_image(raw_image)
 
     if input_method == "🖼️ اختيار من المعرض / الاستوديو":
         st.image(optimized_img, caption='الوجبة المختارة', use_container_width=True)
@@ -132,13 +138,13 @@ if uploaded_image is not None:
     analyze_btn = st.button("تحليل الوجبة وإضافتها للسجل 🔍", type="primary")
 
     if analyze_btn:
-        if not API_KEY or API_KEY == "ضع_مفتاح_GEMINI_الخاص_بك_هنا":
-            st.error("يرجى إدخال API Key الخاص بك أولاً في الكود أو القائمة الجانبية!")
+        if not api_key:
+            st.error("⚠️ يرجى إدخال Gemini API Key في القائمة الجانبية أو ضبطه في Secrets للبدء!")
         else:
             with st.spinner("جاري التحليل السريع للوجبة... ⚡"):
                 try:
-                    # الاعتماد على نموذج السرعة العالية
-                    model = genai.GenerativeModel('gemini-2.0-flash')
+                    # إعداد الـ Client باستخدام المكتبة الجديدة الحديثة
+                    client = genai.Client(api_key=api_key)
                     
                     prompt = """
                     أنت خبير تغذية صارم جداً ولا تجامل (Brutally Honest). 
@@ -151,7 +157,12 @@ if uploaded_image is not None:
                     3. **النقد الصارم والحكم النهائي:** (مخاطر الوجبة ونصيحة حازمة بدون مجاملة في 3 أسطر فقط).
                     """
 
-                    response = model.generate_content([prompt, optimized_img])
+                    # الاستدعاء الصحيح وفق google-genai
+                    response = client.models.generate_content(
+                        model='gemini-2.0-flash',
+                        contents=[optimized_img, prompt]
+                    )
+                    
                     analysis_text = response.text
 
                     # استخراج عدد السعرات تلقائياً
@@ -172,13 +183,7 @@ if uploaded_image is not None:
                     st.success(f"✅ تم التسجيل ورصد {extracted_calories} سعرة حرارية!")
 
                 except Exception as e:
-                    # الخيار الاحتياطي في حال عدم إتاحة النموذج في بعض المناطق
-                    try:
-                        model = genai.GenerativeModel('models/gemini-2.0-flash')
-                        response = model.generate_content([prompt, optimized_img])
-                        st.markdown(response.text)
-                    except Exception as fallback_err:
-                        st.error(f"حدث خطأ أثناء التحليل: {fallback_err}")
+                    st.error(f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {e}")
 
 # 9. عرض سجل الوجبات اليومية
 if st.session_state.meals_history:
