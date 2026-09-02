@@ -11,7 +11,7 @@ import requests
 import streamlit as st
 
 # ---------------------------------------------------------
-# 1. Page Configuration (مغلق افتراضياً لتفادي التداخل في الهواتف)
+# 1. Page Configuration
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="حارس التغذية والصحة | Health & Nutrition Guard",
@@ -46,35 +46,34 @@ if "user_tdee" not in st.session_state:
     st.session_state.user_tdee = 0
 
 # ---------------------------------------------------------
-# 3. Sidebar Setup
+# 3. Language & Global Responsive CSS Fixes
 # ---------------------------------------------------------
-with st.sidebar:
-    st.header("🌐 Language / اللغة")
-    selected_lang = st.radio(
-        "Select Language / اختر اللغة:",
-        ["العربية", "English"],
-        index=0 if st.session_state.lang == "العربية" else 1,
-    )
-    st.session_state.lang = selected_lang
-
 is_ar = st.session_state.lang == "العربية"
 
-# Dynamic Responsive RTL / LTR CSS
 direction_css = f"""
 <style>
     /* الضبط العام للغة والاتجاه */
-    .stApp, .main, [data-testid="stSidebar"] {{
+    .stApp, .main {{
         direction: {('rtl' if is_ar else 'ltr')};
         text-align: {('right' if is_ar else 'left')};
     }}
     
-    /* إصلاح تداخل القائمة الجانبية والشاشات الصغيرة */
+    /* حل مشكلة تداخل حروف الشريط الجانبي العمودية على الهواتف */
     @media (max-width: 768px) {{
-        [data-testid="stSidebar"] {{
-            z-index: 99999 !important;
+        /* إخفاء القوائم والأزرار المتداخلة عندما تكون Sidebar في حالة طي */
+        section[data-testid="stSidebar"][aria-expanded="false"] {{
+            margin-left: -100vw !important;
+            margin-right: -100vw !important;
+            display: none !important;
         }}
         section[data-testid="stSidebar"] > div {{
-            padding-top: 2rem;
+            width: 100% !important;
+            word-wrap: break-word !important;
+            white-space: normal !important;
+        }}
+        /* منع انكماش النصوص عمودياً */
+        [data-testid="stSidebar"] * {{
+            word-break: normal !important;
         }}
     }}
 
@@ -113,6 +112,77 @@ direction_css = f"""
 
 st.markdown(direction_css, unsafe_allow_html=True)
 
+# ---------------------------------------------------------
+# 4. Sidebar Elements
+# ---------------------------------------------------------
+with st.sidebar:
+    st.header("🌐 Language / اللغة")
+    selected_lang = st.radio(
+        "Select Language / اختر اللغة:",
+        ["العربية", "English"],
+        index=0 if st.session_state.lang == "العربية" else 1,
+    )
+    st.session_state.lang = selected_lang
+
+    st.markdown("---")
+    st.header("🔑 إعدادات المفتاح" if is_ar else "🔑 API Settings")
+
+    raw_api_key = (
+        st.secrets.get("OPENROUTER_API_KEY")
+        or os.environ.get("OPENROUTER_API_KEY")
+        or ""
+    )
+
+    user_key_input = st.text_input(
+        "أدخل OpenRouter API Key:" if is_ar else "Enter OpenRouter API Key:",
+        value=raw_api_key,
+        type="password",
+    )
+    api_key = user_key_input.strip() if user_key_input else ""
+
+    # إجبار الكود على استخدام نموذج OpenAI GPT-4o-mini حصراً
+    selected_model = "openai/gpt-4o-mini"
+    st.text_input(
+        "النموذج المعتمد:" if is_ar else "Active Model:",
+        value=selected_model,
+        disabled=True,
+    )
+
+    st.markdown("---")
+    st.header("⏱️ نظام الصيام المتقطع" if is_ar else "⏱️ Intermittent Fasting")
+    fasting_plan = st.selectbox(
+        "خطة الصيام (ساعة):" if is_ar else "Fasting Plan (Hours):",
+        [12, 14, 16, 18, 20],
+    )
+
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        if st.button(
+            "بدء الصيام 🚀" if is_ar else "Start Fast 🚀",
+            use_container_width=True,
+        ):
+            st.session_state.fast_start_time = datetime.now()
+            st.success("Started!" if not is_ar else "تم بدء الصيام!")
+
+    with col_f2:
+        if st.button(
+            "إنهاء الصيام 🛑" if is_ar else "End Fast 🛑",
+            use_container_width=True,
+        ):
+            st.session_state.fast_start_time = None
+            st.warning("Ended." if not is_ar else "تم إنهاء الصيام.")
+
+    st.markdown("---")
+    if st.button(
+        "🗑️ إعادة ضبط سجل اليوم" if is_ar else "🗑️ Reset Daily Log",
+        use_container_width=True,
+    ):
+        st.session_state.meals_history = []
+        st.session_state.latest_analysis = None
+        st.session_state.medical_report_analysis = None
+        st.session_state.profile_calculated = False
+        st.success("Cleared!" if not is_ar else "تم مسح البيانات والسجل!")
+
 # Language Specific Translations
 t = {
     "title": "🥗 حارس التغذية والصحة الذكي"
@@ -127,20 +197,6 @@ t = {
         "Comprehensive Nutrition Tracking & Medical Analysis | Designed by:"
         " Mustafa Khalid Jasim"
     ),
-    "api_header": "🔑 إعدادات المفتاح" if is_ar else "🔑 API Settings",
-    "api_key_label": "أدخل OpenRouter API Key:"
-    if is_ar
-    else "Enter OpenRouter API Key:",
-    "selected_model_label": "النموذج المعتمد:" if is_ar else "Active Model:",
-    "fasting_header": "⏱️ نظام الصيام المتقطع"
-    if is_ar
-    else "⏱️ Intermittent Fasting",
-    "fasting_plan": "خطة الصيام (ساعة):"
-    if is_ar
-    else "Fasting Plan (Hours):",
-    "start_fast": "بدء الصيام 🚀" if is_ar else "Start Fast 🚀",
-    "end_fast": "إنهاء الصيام 🛑" if is_ar else "End Fast 🛑",
-    "reset_day": "🗑️ إعادة ضبط سجل اليوم" if is_ar else "🗑️ Reset Daily Log",
     "profile_header": "👤 أدخل بياناتك الشخصية لحساب السعرات المناسبة"
     if is_ar
     else "👤 Enter Your Details to Calculate Calories",
@@ -223,51 +279,6 @@ t = {
 }
 
 # ---------------------------------------------------------
-# Sidebar Elements
-# ---------------------------------------------------------
-with st.sidebar:
-    st.markdown("---")
-    st.header(t["api_header"])
-
-    raw_api_key = (
-        st.secrets.get("OPENROUTER_API_KEY")
-        or os.environ.get("OPENROUTER_API_KEY")
-        or ""
-    )
-
-    user_key_input = st.text_input(
-        t["api_key_label"], value=raw_api_key, type="password"
-    )
-    api_key = user_key_input.strip() if user_key_input else ""
-
-    # إجبار الكود على استخدام نموذج OpenAI GPT-4o-mini حصراً
-    selected_model = "openai/gpt-4o-mini"
-    st.text_input(t["selected_model_label"], value=selected_model, disabled=True)
-
-    st.markdown("---")
-    st.header(t["fasting_header"])
-    fasting_plan = st.selectbox(t["fasting_plan"], [12, 14, 16, 18, 20])
-
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        if st.button(t["start_fast"], use_container_width=True):
-            st.session_state.fast_start_time = datetime.now()
-            st.success("Started!" if not is_ar else "تم بدء الصيام!")
-
-    with col_f2:
-        if st.button(t["end_fast"], use_container_width=True):
-            st.session_state.fast_start_time = None
-            st.warning("Ended." if not is_ar else "تم إنهاء الصيام.")
-
-    st.markdown("---")
-    if st.button(t["reset_day"], use_container_width=True):
-        st.session_state.meals_history = []
-        st.session_state.latest_analysis = None
-        st.session_state.medical_report_analysis = None
-        st.session_state.profile_calculated = False
-        st.success("Cleared!" if not is_ar else "تم مسح البيانات والسجل!")
-
-# ---------------------------------------------------------
 # Main UI Header
 # ---------------------------------------------------------
 st.markdown(f'<div class="main-title">{t["title"]}</div>', unsafe_allow_html=True)
@@ -298,7 +309,7 @@ def calculate_bmr(weight, height, age, gender_val):
 
 
 # ---------------------------------------------------------
-# 4. Profile Inputs & Calculation Trigger
+# 5. Profile Inputs & Calculation Trigger
 # ---------------------------------------------------------
 st.markdown(f"### {t['profile_header']}")
 
@@ -315,7 +326,7 @@ with st.expander("📝 اضغط هنا لإدخال بياناتك وضبط ال
         )
     with col_p4:
         height = st.number_input(
-            t["height"], min_value=100.0, max_value=230.0, value=175.0, step=0.5
+            t["height"], min_value=100.0, max_value=230.0, value=175.5, step=0.5
         )
 
     col_p5, col_p6 = st.columns(2)
@@ -416,7 +427,7 @@ if st.session_state.medical_report_analysis:
 st.markdown("---")
 
 # ---------------------------------------------------------
-# 5. Dashboard Metrics
+# 6. Dashboard Metrics
 # ---------------------------------------------------------
 if not st.session_state.profile_calculated:
     st.warning(
@@ -477,7 +488,7 @@ else:
     st.markdown("---")
 
     # ---------------------------------------------------------
-    # 6. AI Meal Vision Scanner
+    # 7. AI Meal Vision Scanner
     # ---------------------------------------------------------
     st.markdown(f"### {t['meal_header']}")
 
