@@ -3,6 +3,7 @@ import io
 import json
 import os
 import re
+import time
 from datetime import datetime, timedelta
 
 from PIL import Image
@@ -10,7 +11,7 @@ import requests
 import streamlit as st
 
 # ---------------------------------------------------------
-# 1. Page Configuration & Title Layout
+# 1. Page Configuration & Title
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="حارس التغذية والصيام المتقطع", page_icon="🔥", layout="centered"
@@ -21,10 +22,10 @@ st.caption("Designed by: Mustafa Khalid Jasim")
 
 
 # ---------------------------------------------------------
-# 2. Helper Functions for Image Processing
+# 2. Helper Functions
 # ---------------------------------------------------------
 def optimize_image(img, max_size=800):
-    """Resize and compress image for faster OpenRouter vision API processing."""
+    """Resize and convert image to strict RGB JPEG."""
     img = img.convert("RGB")
     img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
     return img
@@ -33,7 +34,7 @@ def optimize_image(img, max_size=800):
 def encode_image_to_base64(pil_img):
     """Convert a PIL image to a Base64 string for API payloads."""
     buffered = io.BytesIO()
-    pil_img.save(buffered, format="JPEG")
+    pil_img.save(buffered, format="JPEG", quality=85)
     img_bytes = buffered.getvalue()
     return base64.b64encode(img_bytes).decode("utf-8")
 
@@ -51,11 +52,10 @@ if "fast_start_time" not in st.session_state:
     st.session_state.fast_start_time = None
 
 # ---------------------------------------------------------
-# 4. Sidebar: OpenRouter Key & App Settings
+# 4. Sidebar Options
 # ---------------------------------------------------------
 st.sidebar.header("🔑 إعدادات OpenRouter API")
 
-# Retrieve OpenRouter key from Secrets or System Environment
 raw_api_key = (
     st.secrets.get("OPENROUTER_API_KEY")
     or os.environ.get("OPENROUTER_API_KEY")
@@ -71,7 +71,7 @@ user_key_input = st.sidebar.text_input(
 
 api_key = user_key_input.strip() if user_key_input else ""
 
-# Valid OpenRouter Vision Models
+# Tested OpenRouter Vision Models
 selected_model = st.sidebar.selectbox(
     "اختر نموذج الذكاء الاصطناعي:",
     [
@@ -118,7 +118,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("**Designed by:**\nMustafa Khalid Jasim")
 
 # ---------------------------------------------------------
-# 5. Dashboard Metrics & Intermittent Fasting Timer
+# 5. Dashboard Metrics
 # ---------------------------------------------------------
 consumed_calories = sum(
     meal["calories"] for meal in st.session_state.meals_history
@@ -144,7 +144,6 @@ else:
         delta_color="inverse",
     )
 
-# Fasting Timer Display
 if st.session_state.fast_start_time:
     elapsed_time = datetime.now() - st.session_state.fast_start_time
     required_hours = timedelta(hours=fasting_plan)
@@ -163,7 +162,7 @@ if st.session_state.fast_start_time:
 st.markdown("---")
 
 # ---------------------------------------------------------
-# 6. Image Acquisition Section
+# 6. Image Input
 # ---------------------------------------------------------
 st.subheader("📸 فحص وتسجيل وجبة جديدة")
 
@@ -183,7 +182,7 @@ else:
     )
 
 # ---------------------------------------------------------
-# 7. OpenRouter AI Analysis & Processing Engine
+# 7. AI Analysis Engine
 # ---------------------------------------------------------
 if uploaded_image is not None:
     raw_image = Image.open(uploaded_image)
@@ -201,34 +200,32 @@ if uploaded_image is not None:
 
     if analyze_btn:
         if not api_key:
-            st.error(
-                "⚠️ يرجى إدخال OpenRouter API Key في القائمة الجانبية أو ضبطه في Secrets للبدء!"
-            )
+            st.error("⚠️ يرجى إدخال OpenRouter API Key في القائمة الجانبية!")
         else:
-            with st.spinner(
-                "جاري التحليل السريع للوجبة عبر OpenRouter AI... ⚡"
-            ):
+            with st.spinner("جاري فحص الصورة وتحليلها بدقة... ⚡"):
                 try:
                     base64_str = encode_image_to_base64(optimized_img)
                     data_url = f"data:image/jpeg;base64,{base64_str}"
 
-                    prompt = """
-                    أنت خبير تغذية صارم جداً ولا تجامل (Brutally Honest). 
-                    قم بتحليل صورة الوجبة المرفقة واكتب التقرير بشكل مختصر ومباشر دون إطالة وفق التالي:
+                    # Unique prompt with timestamp to force fresh inference
+                    prompt = f"""
+                    [Timestamp: {time.time()}]
+                    انظر إلى هذه الصورة بدقة عالية واشرح ما تراه فقط.
+                    إذا كانت الصورة تحتوي على ماء أو كوب ماء فارغ/مليء، السعرات تكون 0 سعرة.
+                    أنت خبير تغذية صارم جداً. قم بتحليل العنصر في الصورة بدقة واكتب التقرير كالتالي:
 
-                    الإجمالي التقديري للسعرات: [اكتب الرقم فقط ثم كلمة سعرة، مثال: 650 سعرة]
+                    الإجمالي التقديري للسعرات: [اكتب الرقم فقط ثم كلمة سعرة، مثال: 0 سعرة]
 
-                    1. **المكونات والسعرات:** (تقدير سريع بدقة)
-                    2. **القيم الغذائية:** (البروتين/الكربوهيدرات/الدهون بالجرام تقريباً)
-                    3. **النقد الصارم والحكم النهائي:** (مخاطر الوجبة ونصيحة حازمة بدون مجاملة في 3 أسطر فقط).
+                    1. **المكونات والسعرات:** (تحديد العنصر المباشر في الصورة بدقة)
+                    2. **القيم الغذائية:** (البروتين/الكربوهيدرات/الدهون)
+                    3. **النقد الصارم والحكم النهائي:** (نصيحة في 3 أسطر).
                     """
 
-                    # OpenRouter API Standard Headers
                     headers = {
                         "Authorization": f"Bearer {api_key}",
                         "HTTP-Referer": "https://streamlit.io",
-                        "X-Title": "Fasting & Nutrition Guard",
-                        "Content-Type": "json",
+                        "X-Title": "Fasting Guard Vision",
+                        "Content-Type": "application/json",
                     }
 
                     payload = {
@@ -248,7 +245,7 @@ if uploaded_image is not None:
                     response = requests.post(
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
-                        data=json.dumps(payload),
+                        json=payload,
                         timeout=40,
                     )
 
@@ -258,7 +255,6 @@ if uploaded_image is not None:
                             "content"
                         ]
 
-                        # Regex parsing for extracted calories
                         cal_match = re.search(
                             r"الإجمالي التقديري للسعرات:\s*(\d+)", analysis_text
                         )
@@ -271,7 +267,6 @@ if uploaded_image is not None:
                             int(cal_match.group(1)) if cal_match else 0
                         )
 
-                        # Save meal record
                         st.session_state.meals_history.append({
                             "time": datetime.now().strftime("%I:%M %p"),
                             "name": meal_name,
@@ -279,12 +274,7 @@ if uploaded_image is not None:
                             "details": analysis_text,
                         })
 
-                        st.markdown("---")
-                        st.markdown("### 📊 التقرير والتحليل الغذائي:")
-                        st.markdown(analysis_text)
-                        st.success(
-                            f"✅ تم التسجيل ورصد {extracted_calories} سعرة حرارية!"
-                        )
+                        st.rerun()
                     else:
                         st.error(
                             f"فشل الاتصال بـ OpenRouter ({response.status_code}): {response.text}"
@@ -294,7 +284,7 @@ if uploaded_image is not None:
                     st.error(f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {e}")
 
 # ---------------------------------------------------------
-# 8. Daily Meals Log History
+# 8. Daily Meals Log
 # ---------------------------------------------------------
 if st.session_state.meals_history:
     st.markdown("---")
