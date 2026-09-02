@@ -11,13 +11,13 @@ import requests
 import streamlit as st
 
 # ---------------------------------------------------------
-# 1. Page Configuration
+# 1. Page Configuration (مغلق افتراضياً لتفادي التداخل في الهواتف)
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="حارس التغذية والصحة | Health & Nutrition Guard",
     page_icon="🥗",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ---------------------------------------------------------
@@ -38,7 +38,6 @@ if "latest_analysis" not in st.session_state:
 if "medical_report_analysis" not in st.session_state:
     st.session_state.medical_report_analysis = None
 
-# حالة تخزين حسابات السعرات بعد الضغط على الزر
 if "profile_calculated" not in st.session_state:
     st.session_state.profile_calculated = False
 if "user_bmr" not in st.session_state:
@@ -60,14 +59,26 @@ with st.sidebar:
 
 is_ar = st.session_state.lang == "العربية"
 
-# Apply Dynamic RTL / LTR CSS with Streamlit Columns Fix
+# Dynamic Responsive RTL / LTR CSS
 direction_css = f"""
 <style>
-    .main, [data-testid="stSidebar"], .stApp {{
+    /* الضبط العام للغة والاتجاه */
+    .stApp, .main, [data-testid="stSidebar"] {{
         direction: {('rtl' if is_ar else 'ltr')};
         text-align: {('right' if is_ar else 'left')};
     }}
     
+    /* إصلاح تداخل القائمة الجانبية والشاشات الصغيرة */
+    @media (max-width: 768px) {{
+        [data-testid="stSidebar"] {{
+            z-index: 99999 !important;
+        }}
+        section[data-testid="stSidebar"] > div {{
+            padding-top: 2rem;
+        }}
+    }}
+
+    /* إصلاح الأعمدة في نمط RTL */
     {'''
     [data-testid="column"] {
         direction: rtl !important;
@@ -83,14 +94,15 @@ direction_css = f"""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         font-weight: 800;
-        font-size: 2.2rem;
+        font-size: 2rem;
         text-align: center;
         margin-bottom: 0.2rem;
+        word-wrap: break-word;
     }}
     .sub-title {{
         text-align: center;
         color: #64748b;
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         margin-bottom: 1.5rem;
     }}
     div[data-testid="stMetricValue"] {{
@@ -115,13 +127,11 @@ t = {
         "Comprehensive Nutrition Tracking & Medical Analysis | Designed by:"
         " Mustafa Khalid Jasim"
     ),
-    "api_header": "🔑 إعدادات النموذج" if is_ar else "🔑 Model Settings",
+    "api_header": "🔑 إعدادات المفتاح" if is_ar else "🔑 API Settings",
     "api_key_label": "أدخل OpenRouter API Key:"
     if is_ar
     else "Enter OpenRouter API Key:",
-    "select_model": "اختر نموذج الذكاء الاصطناعي:"
-    if is_ar
-    else "Select AI Model:",
+    "selected_model_label": "النموذج المعتمد:" if is_ar else "Active Model:",
     "fasting_header": "⏱️ نظام الصيام المتقطع"
     if is_ar
     else "⏱️ Intermittent Fasting",
@@ -226,21 +236,13 @@ with st.sidebar:
     )
 
     user_key_input = st.text_input(
-        t["api_key_label"],
-        value=raw_api_key,
-        type="password",
+        t["api_key_label"], value=raw_api_key, type="password"
     )
     api_key = user_key_input.strip() if user_key_input else ""
 
-    selected_model = st.selectbox(
-        t["select_model"],
-        [
-            "google/gemini-2.0-flash-001",
-            "openai/gpt-4o-mini",
-            "anthropic/claude-3.5-sonnet",
-        ],
-        index=0,
-    )
+    # إجبار الكود على استخدام نموذج OpenAI GPT-4o-mini حصراً
+    selected_model = "openai/gpt-4o-mini"
+    st.text_input(t["selected_model_label"], value=selected_model, disabled=True)
 
     st.markdown("---")
     st.header(t["fasting_header"])
@@ -274,9 +276,7 @@ st.markdown(
 )
 
 
-# ---------------------------------------------------------
 # Helper Functions
-# ---------------------------------------------------------
 def optimize_image(img, max_size=900):
     img = img.convert("RGB")
     img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
@@ -334,9 +334,7 @@ with st.expander("📝 اضغط هنا لإدخال بياناتك وضبط ال
         key="medical_report",
     )
 
-    # زر إرسال البيانات ومعالجتها
     if st.button(t["btn_calc_profile"], type="primary"):
-        # حساب السعرات
         base_bmr = calculate_bmr(weight, height, age, gender)
         act_index = t["activity_opts"].index(activity_level)
         multipliers = [1.2, 1.375, 1.55, 1.725]
@@ -346,103 +344,86 @@ with st.expander("📝 اضغط هنا لإدخال بياناتك وضبط ال
         st.session_state.user_tdee = calculated_tdee
         st.session_state.profile_calculated = True
 
-        # إذا قام المستخدم برفع تقرير طبي يتم تحليله عبر API
-        if uploaded_report is not None:
-            if not api_key:
-                st.warning(
-                    "⚠️ تم حساب السعرات! (لتحليل التقرير الطبي المرفق يرجى"
-                    " أدخال API Key في القائمة الجانبية)."
-                )
-            else:
-                with st.spinner("جاري تحليل التقرير الطبي وتوليد التوصيات... ⚡"):
-                    try:
-                        rep_img = Image.open(uploaded_report)
-                        opt_rep = optimize_image(rep_img)
-                        b64_rep = encode_image_to_base64(opt_rep)
+        if uploaded_report is not None and api_key:
+            with st.spinner("جاري تحليل التقرير الطبي مع gpt-4o-mini... ⚡"):
+                try:
+                    rep_img = Image.open(uploaded_report)
+                    opt_rep = optimize_image(rep_img)
+                    b64_rep = encode_image_to_base64(opt_rep)
 
-                        lang_instruction = (
-                            "أجب باللغة العربية حصراً وبصيغة من اليمين إلى"
-                            " اليسار."
-                            if is_ar
-                            else "Respond strictly in English in LTR format."
-                        )
+                    lang_instruction = (
+                        "أجب باللغة العربية حصراً وبصيغة RTL."
+                        if is_ar
+                        else "Respond strictly in English."
+                    )
 
-                        report_prompt = f"""
-                        [Instruction: {lang_instruction}]
-                        You are a clinical nutritionist and medical expert.
-                        Patient Details: Age {age}, Gender {gender}, Weight {weight}kg, Height {height}cm.
-                        Conditions: {', '.join(medical_conditions) if medical_conditions else 'None'}.
-                        Calculated Target Calories: {calculated_tdee} Kcal.
+                    report_prompt = f"""
+                    [Instruction: {lang_instruction}]
+                    Clinical nutritionist audit:
+                    Patient Details: Age {age}, Gender {gender}, Weight {weight}kg, Height {height}cm.
+                    Conditions: {', '.join(medical_conditions) if medical_conditions else 'None'}.
+                    Target Calories: {calculated_tdee} Kcal.
+                    Analyze attached report.
+                    """
 
-                        Analyze the attached medical report image and detail:
-                        1. **Medical Summary & Biomarkers.**
-                        2. **Expected Body Fat Distribution** (Visceral vs Subcutaneous fat).
-                        3. **Caloric & Macro Plan.**
-                        4. **Strict Allowed & Prohibited Foods.**
-                        """
+                    headers = {
+                        "Authorization": f"Bearer {api_key}",
+                        "HTTP-Referer": "https://streamlit.io",
+                        "Content-Type": "application/json",
+                    }
 
-                        headers = {
-                            "Authorization": f"Bearer {api_key}",
-                            "HTTP-Referer": "https://streamlit.io",
-                            "X-Title": "Medical Guard",
-                            "Content-Type": "application/json",
-                        }
-
-                        payload = {
-                            "model": selected_model,
-                            "messages": [{
-                                "role": "user",
-                                "content": [
-                                    {"type": "text", "text": report_prompt},
-                                    {
-                                        "type": "image_url",
-                                        "image_url": {
-                                            "url": (
-                                                "data:image/jpeg;base64,"
-                                                f"{b64_rep}"
-                                            )
-                                        },
+                    payload = {
+                        "model": selected_model,
+                        "messages": [{
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": report_prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": (
+                                            "data:image/jpeg;base64," f"{b64_rep}"
+                                        )
                                     },
-                                ],
-                            }],
-                        }
+                                },
+                            ],
+                        }],
+                    }
 
-                        res = requests.post(
-                            "https://openrouter.ai/api/v1/chat/completions",
-                            headers=headers,
-                            data=json.dumps(payload),
-                            timeout=45,
-                        )
+                    res = requests.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        data=json.dumps(payload),
+                        timeout=45,
+                    )
 
-                        if res.status_code == 200:
-                            st.session_state.medical_report_analysis = (
-                                res.json()["choices"][0]["message"]["content"]
-                            )
-                    except Exception as e:
-                        st.error(f"Error analyzing report: {e}")
+                    if res.status_code == 200:
+                        st.session_state.medical_report_analysis = res.json()[
+                            "choices"
+                        ][0]["message"]["content"]
+                except Exception as e:
+                    st.error(f"Error analyzing report: {e}")
 
         st.success(
-            "✅ تم حساب السعرات الموصى بها بنجاح وتحديث الميزانية!"
+            "✅ تم حساب السعرات بنجاح!"
             if is_ar
-            else "✅ Recommended calories successfully calculated!"
+            else "✅ Calories calculated successfully!"
         )
 
-# عرض التقرير الطبي المترجم إذا توفر
 if st.session_state.medical_report_analysis:
     st.info(st.session_state.medical_report_analysis)
 
 st.markdown("---")
 
 # ---------------------------------------------------------
-# 5. Dashboard Metrics (تظهر فقط بعد إدخال البيانات والضغط على الزر)
+# 5. Dashboard Metrics
 # ---------------------------------------------------------
 if not st.session_state.profile_calculated:
     st.warning(
-        "👈 يرجى إدخال بياناتك (الوزن، الطول، العمر) ثم الضغط على زر [تحليل"
-        " البيانات وحساب السعرات المناسبة] لعرض الميزانية اليومية للوجبات."
+        "👈 يرجى إدخال بياناتك أعلاه والضغط على زر [تحليل البيانات وحساب"
+        " السعرات المناسبة] لتحديث لوحة التحليل."
         if is_ar
-        else "👈 Please enter your details above and click [Calculate Recommended"
-        " Calories] to display your daily budget."
+        else "👈 Please enter your details above and click calculate."
     )
 else:
     daily_target = st.session_state.user_tdee
@@ -484,18 +465,14 @@ else:
             )
             minutes, seconds = divmod(remainder, 60)
             st.warning(
-                f"⏳ فترة الصيام المتقطع نشطة ({fasting_plan} ساعة). المتبقي:"
+                f"⏳ فترة الصيام نشطة ({fasting_plan} ساعة). المتبقي:"
                 f" {hours:02d}:{minutes:02d}:{seconds:02d}"
                 if is_ar
                 else f"⏳ Fasting Active ({fasting_plan}h). Remaining:"
                 f" {hours:02d}:{minutes:02d}:{seconds:02d}"
             )
         else:
-            st.success(
-                "🎉 انتهت فترة الصيام المتقطع!"
-                if is_ar
-                else "🎉 Fasting Period Complete!"
-            )
+            st.success("🎉 انتهت فترة الصيام!")
 
     st.markdown("---")
 
@@ -533,38 +510,32 @@ else:
             if not api_key:
                 st.error("API Key Required!")
             else:
-                with st.spinner("Analyzing Food... ⚡"):
+                with st.spinner("Analyzing Food via gpt-4o-mini... ⚡"):
                     try:
                         b64_meal = encode_image_to_base64(opt_meal_img)
                         meal_data_url = f"data:image/jpeg;base64,{b64_meal}"
 
                         lang_prompt_instruction = (
-                            "أكتب التقرير والتحليل باللغة العربية حصراً وبصيغة"
-                            " RTL"
+                            "أكتب التقرير باللغة العربية RTL"
                             if is_ar
-                            else "Write the report in English in LTR layout."
+                            else "Write in English LTR"
                         )
 
                         meal_prompt = f"""
                         [Req_ID: {time.time()}]
                         [Instruction: {lang_prompt_instruction}]
-                        You are a clinical nutrition expert.
-                        Examine the food/beverage image closely:
-                        - If the image contains pure water or zero-calorie beverage, set estimated calories strictly to 0 Kcal.
-                        - Format the output EXACTLY as follows:
+                        Examine the food image. Format output as:
+                        الإجمالي التقديري للسعرات: [x] سعرة
 
-                        الإجمالي التقديري للسعرات: [x] سعرة  (or for English: Estimated Total Calories: [x] Kcal)
-
-                        1. **{"المكونات والسعرات" if is_ar else "Ingredients & Calories"}:** (Detailed itemized list).
-                        2. **{"القيم الغذائية" if is_ar else "Nutritional Values"}:** (Protein / Carbs / Fats in grams).
-                        3. **{"التأثير الصحي والملاءمة" if is_ar else "Health Impact & Suitability"}:** (Compatibility with user profile).
-                        4. **{"النقد الصارم والحكم النهائي" if is_ar else "Strict Verdict & Advice"}:** (Direct 3-line expert guidance).
+                        1. المكونات والسعرات.
+                        2. القيم الغذائية.
+                        3. التأثير الصحي.
+                        4. الحكم النهائي.
                         """
 
                         headers = {
                             "Authorization": f"Bearer {api_key}",
                             "HTTP-Referer": "https://streamlit.io",
-                            "X-Title": "Nutrition Vision Guard",
                             "Content-Type": "application/json",
                         }
 
@@ -619,16 +590,9 @@ else:
                             })
 
                             st.session_state.latest_analysis = analysis_text
-                            st.success(
-                                "✅ تم تحليل الوجبة بنجاح!"
-                                if is_ar
-                                else "✅ Success!"
-                            )
+                            st.success("✅ تم تحليل الوجبة بنجاح!")
                         else:
-                            st.error(
-                                f"API Error ({response.status_code}):"
-                                f" {response.text}"
-                            )
+                            st.error(f"API Error: {response.status_code}")
 
                     except Exception as e:
                         st.error(f"Processing Error: {e}")
@@ -637,9 +601,6 @@ else:
         st.markdown(f"#### {t['latest_report_title']}")
         st.info(st.session_state.latest_analysis)
 
-    # ---------------------------------------------------------
-    # 7. Today's Meal History Log
-    # ---------------------------------------------------------
     if st.session_state.meals_history:
         st.markdown("---")
         st.markdown(f"### {t['history_header']}")
