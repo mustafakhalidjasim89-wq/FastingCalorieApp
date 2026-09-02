@@ -11,116 +11,21 @@ import requests
 import streamlit as st
 
 # ---------------------------------------------------------
-# 1. Page Configuration & Custom CSS Styling (واجهة حديثة)
+# 1. Page Configuration
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="حارس التغذية والصحة الذكي",
+    page_title="حارس التغذية والصحة | Health & Nutrition Guard",
     page_icon="🥗",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# تطبيق تنسيق بصري احترافي بألوان متناسقة (Emerald & Teal Theme)
-st.markdown(
-    """
-<style>
-    /* Gradient Background & Fonts */
-    .main {
-        background-color: #f8fafc;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    
-    /* Header Styling */
-    .main-title {
-        background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-weight: 800;
-        font-size: 2.3rem;
-        text-align: center;
-        margin-bottom: 0.2rem;
-    }
-    
-    .sub-title {
-        text-align: center;
-        color: #64748b;
-        font-size: 1rem;
-        margin-bottom: 2rem;
-    }
-    
-    /* Card Container Style */
-    .css-card {
-        background-color: #ffffff;
-        border-radius: 12px;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        border: 1px solid #e2e8f0;
-        margin-bottom: 1.5rem;
-    }
-    
-    /* Metric Card Customization */
-    [data-testid="stMetricValue"] {
-        font-weight: 700;
-        color: #0f172a;
-    }
-    
-    /* Button Styling */
-    .stButton>button {
-        border-radius: 8px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    
-    /* Sidebar Styling */
-    [data-testid="stSidebar"] {
-        background-color: #f1f5f9;
-        border-left: 1px solid #e2e8f0;
-    }
-</style>
-""",
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    '<div class="main-title">🥗 حارس التغذية والصحة الذكي</div>',
-    unsafe_allow_html=True,
-)
-st.markdown(
-    '<div class="sub-title">نظام المتابعة التغذوية والتحليل الطبي الشامل |'
-    " Designed by: Mustafa Khalid Jasim</div>",
-    unsafe_allow_html=True,
-)
-
-
 # ---------------------------------------------------------
-# 2. Helper Functions
+# 2. Session State Initialization
 # ---------------------------------------------------------
-def optimize_image(img, max_size=900):
-    """Resize and compress image for fast AI processing."""
-    img = img.convert("RGB")
-    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-    return img
+if "lang" not in st.session_state:
+    st.session_state.lang = "العربية"
 
-
-def encode_image_to_base64(pil_img):
-    """Convert PIL Image to Base64 string."""
-    buffered = io.BytesIO()
-    pil_img.save(buffered, format="JPEG", quality=85)
-    img_bytes = buffered.getvalue()
-    return base64.b64encode(img_bytes).decode("utf-8")
-
-
-def calculate_bmr(weight, height, age, gender):
-    """حساب السعرات الحرارية الأساسية (Mifflin-St Jeor Equation)."""
-    if gender == "ذكر":
-        return int(10 * weight + 6.25 * height - 5 * age + 5)
-    else:
-        return int(10 * weight + 6.25 * height - 5 * age - 161)
-
-
-# ---------------------------------------------------------
-# 3. Session State Initialization
-# ---------------------------------------------------------
 if "meals_history" not in st.session_state:
     st.session_state.meals_history = []
 
@@ -134,10 +39,173 @@ if "medical_report_analysis" not in st.session_state:
     st.session_state.medical_report_analysis = None
 
 # ---------------------------------------------------------
-# 4. Sidebar: API Key & Models
+# 3. Sidebar Language & Settings Setup
 # ---------------------------------------------------------
 with st.sidebar:
-    st.header("🔑 إعدادات النظام والنموذج")
+    st.header("🌐 Language / اللغة")
+    selected_lang = st.radio(
+        "Select Language / اختر اللغة:",
+        ["العربية", "English"],
+        index=0 if st.session_state.lang == "العربية" else 1,
+    )
+    st.session_state.lang = selected_lang
+
+is_ar = st.session_state.lang == "العربية"
+
+# Apply Dynamic RTL / LTR CSS
+direction_css = """
+<style>
+    .main, [data-testid="stSidebar"], .stApp {
+        direction: %s;
+        text-align: %s;
+    }
+    .main-title {
+        background: linear-gradient(135deg, #059669 0%%, #0d9488 100%%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800;
+        font-size: 2.2rem;
+        text-align: center;
+        margin-bottom: 0.2rem;
+    }
+    .sub-title {
+        text-align: center;
+        color: #64748b;
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+    }
+    div[data-testid="stMetricValue"] {
+        font-weight: 700;
+    }
+</style>
+""" % (
+    ("rtl", "right") if is_ar else ("ltr", "left")
+)
+
+st.markdown(direction_css, unsafe_allow_html=True)
+
+# Language Specific Texts
+t = {
+    "title": "🥗 حارس التغذية والصحة الذكي"
+    if is_ar
+    else "🥗 Smart Health & Nutrition Guard",
+    "subtitle": (
+        "نظام المتابعة التغذوية والتحليل الطبي الشامل | Designed by: Mustafa"
+        " Khalid Jasim"
+    )
+    if is_ar
+    else (
+        "Comprehensive Nutrition Tracking & Medical Analysis | Designed by:"
+        " Mustafa Khalid Jasim"
+    ),
+    "api_header": "🔑 إعدادات النموذج" if is_ar else "🔑 Model Settings",
+    "api_key_label": "أدخل OpenRouter API Key:"
+    if is_ar
+    else "Enter OpenRouter API Key:",
+    "select_model": "اختر نموذج الذكاء الاصطناعي:"
+    if is_ar
+    else "Select AI Model:",
+    "fasting_header": "⏱️ نظام الصيام المتقطع"
+    if is_ar
+    else "⏱️ Intermittent Fasting",
+    "fasting_plan": "خطة الصيام (ساعة):"
+    if is_ar
+    else "Fasting Plan (Hours):",
+    "start_fast": "بدء الصيام 🚀" if is_ar else "Start Fast 🚀",
+    "end_fast": "إنهاء الصيام 🛑" if is_ar else "End Fast 🛑",
+    "reset_day": "🗑️ إعادة ضبط سجل اليوم" if is_ar else "🗑️ Reset Daily Log",
+    "profile_header": "👤 الملف الصحي وتخصيص السعرات"
+    if is_ar
+    else "👤 Health Profile & Calorie Setup",
+    "profile_expander": (
+        "📋 أدخل بياناتك الشخصية والتقارير الطبية للحصول على تحليل دقيق"
+        if is_ar
+        else "📋 Enter your details and medical reports for precise analysis"
+    ),
+    "age": "العمر (سنة):" if is_ar else "Age (years):",
+    "gender": "الجنس:" if is_ar else "Gender:",
+    "gender_opts": ["ذكر", "أنثى"] if is_ar else ["Male", "Female"],
+    "weight": "الوزن (كجم):" if is_ar else "Weight (kg):",
+    "height": "الطول (سم):" if is_ar else "Height (cm):",
+    "activity": "مستوى النشاط البدني:" if is_ar else "Activity Level:",
+    "activity_opts": [
+        "خامل (مكتب/بدون تمارين)",
+        "نشاط خفيف (تمارين 1-3 أيام/أسبوع)",
+        "نشاط متوسط (تمارين 3-5 أيام/أسبوع)",
+        "نشاط عالٍ (تمارين شاقة يومياً)",
+    ]
+    if is_ar
+    else [
+        "Sedentary (Office/No Exercise)",
+        "Lightly Active (1-3 days/week)",
+        "Moderately Active (3-5 days/week)",
+        "Very Active (Daily Heavy Exercise)",
+    ],
+    "conditions": "الأمراض والحالات الصحية المشخصة:"
+    if is_ar
+    else "Diagnosed Medical Conditions:",
+    "conditions_opts": [
+        "السكري (Type 2 / Type 1)",
+        "ضغط الدم المرتفع",
+        "خمول الغدة الدرقية",
+        "تكيس المبايض (PCOS)",
+        "ارتفاع الكوليسترول / الدهون الثلاثية",
+        "مقاومة الانسولين",
+        "الكبد الدهني",
+        "لا توجد أمراض مزمنة",
+    ]
+    if is_ar
+    else [
+        "Diabetes (Type 1 / Type 2)",
+        "Hypertension (High BP)",
+        "Hypothyroidism",
+        "PCOS",
+        "High Cholesterol / Triglycerides",
+        "Insulin Resistance",
+        "Fatty Liver",
+        "None",
+    ],
+    "upload_report": "📄 تحميل تقرير طبي / تحاليل دم (اختياري)"
+    if is_ar
+    else "📄 Upload Medical Report / Blood Test (Optional)",
+    "btn_analyze_report": "تحليل التقرير الطبي وتوليد التوصيات الصحية 🧬"
+    if is_ar
+    else "Analyze Medical Report & Generate Insights 🧬",
+    "dashboard_header": "📊 الميزانية اليومية للوجبات والسعرات"
+    if is_ar
+    else "📊 Daily Calories & Meal Dashboard",
+    "bmr": "المعدل الأيضي (BMR)" if is_ar else "BMR",
+    "target": "الاحتياج المستهدف" if is_ar else "Target Intake",
+    "consumed": "المستهلك" if is_ar else "Consumed",
+    "remaining": "المتبقي اليوم" if is_ar else "Remaining",
+    "over_limit": "تجاوزت الحد بـ" if is_ar else "Exceeded By",
+    "meal_header": "📸 فحص الوجبات عبر كاميرا الذكاء الاصطناعي"
+    if is_ar
+    else "📸 AI Food & Meal Scanner",
+    "input_method": "اختر طريقة إدخال صورة الوجبة:"
+    if is_ar
+    else "Choose image source:",
+    "source_opts": ["📷 الكاميرا المباشرة", "🖼️ رفع صورة من المعرض / الجهاز"]
+    if is_ar
+    else ["📷 Live Camera", "🖼️ Upload from Gallery"],
+    "meal_name": "اسم الوجبة (اختياري):" if is_ar else "Meal Name (Optional):",
+    "btn_analyze_meal": "تحليل الوجبة وإضافتها للسجل 🔍"
+    if is_ar
+    else "Analyze Meal & Save Log 🔍",
+    "latest_report_title": "📋 التقرير والتحليل الأخير:"
+    if is_ar
+    else "📋 Latest Meal Report:",
+    "history_header": "📋 سجل الوجبات المسجلة اليوم"
+    if is_ar
+    else "📋 Today's Meal History",
+}
+
+# ---------------------------------------------------------
+# Sidebar Continued
+# ---------------------------------------------------------
+with st.sidebar:
+    st.markdown("---")
+    st.header(t["api_header"])
 
     raw_api_key = (
         st.secrets.get("OPENROUTER_API_KEY")
@@ -146,15 +214,14 @@ with st.sidebar:
     )
 
     user_key_input = st.text_input(
-        "أدخل OpenRouter API Key:",
+        t["api_key_label"],
         value=raw_api_key,
         type="password",
-        help="أدخل المفتاح الخاص بك ابتداءً بـ sk-or-v1-",
     )
     api_key = user_key_input.strip() if user_key_input else ""
 
     selected_model = st.selectbox(
-        "اختر نموذج الذكاء الاصطناعي:",
+        t["select_model"],
         [
             "google/gemini-2.0-flash-001",
             "openai/gpt-4o-mini",
@@ -164,119 +231,134 @@ with st.sidebar:
     )
 
     st.markdown("---")
-    st.header("⏱️ نظام الصيام المتقطع")
-    fasting_plan = st.selectbox("خطة الصيام (ساعة):", [12, 14, 16, 18, 20])
+    st.header(t["fasting_header"])
+    fasting_plan = st.selectbox(t["fasting_plan"], [12, 14, 16, 18, 20])
 
-    col_fast_s, col_fast_e = st.columns(2)
-    with col_fast_s:
-        if st.button("بدء الصيام 🚀", use_container_width=True):
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        if st.button(t["start_fast"], use_container_width=True):
             st.session_state.fast_start_time = datetime.now()
-            st.success("تم بدء الصيام!")
+            st.success("Started!" if not is_ar else "تم بدء الصيام!")
 
-    with col_fast_e:
-        if st.button("إنهاء الصيام 🛑", use_container_width=True):
+    with col_f2:
+        if st.button(t["end_fast"], use_container_width=True):
             st.session_state.fast_start_time = None
-            st.warning("تم إنهاء الصيام.")
+            st.warning("Ended." if not is_ar else "تم إنهاء الصيام.")
 
     st.markdown("---")
-    if st.button("🗑️ إعادة ضبط بيانات اليوم", use_container_width=True):
+    if st.button(t["reset_day"], use_container_width=True):
         st.session_state.meals_history = []
         st.session_state.latest_analysis = None
         st.session_state.medical_report_analysis = None
-        st.success("تم مسح السجل اليومي!")
+        st.success("Cleared!" if not is_ar else "تم مسح السجل اليومي!")
 
 # ---------------------------------------------------------
-# 5. User Profile & Health Diagnostics Section
+# Main UI Header
 # ---------------------------------------------------------
-st.markdown("### 👤 الملف الصحي وتخصيص السعرات")
+st.markdown(f'<div class="main-title">{t["title"]}</div>', unsafe_allow_html=True)
+st.markdown(
+    f'<div class="sub-title">{t["subtitle"]}</div>', unsafe_allow_html=True
+)
 
-with st.expander(
-    "📋 أدخل بياناتك الشخصية والتقارير الطبية للحصول على تحليل دقيق",
-    expanded=True,
-):
+# ---------------------------------------------------------
+# Helper Functions
+# ---------------------------------------------------------
+def optimize_image(img, max_size=900):
+    img = img.convert("RGB")
+    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+    return img
+
+
+def encode_image_to_base64(pil_img):
+    buffered = io.BytesIO()
+    pil_img.save(buffered, format="JPEG", quality=85)
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+
+def calculate_bmr(weight, height, age, gender_val):
+    is_male = (
+        gender_val == "ذكر" or gender_val == "Male" or gender_val == "Male"
+    )
+    if is_male:
+        return int(10 * weight + 6.25 * height - 5 * age + 5)
+    else:
+        return int(10 * weight + 6.25 * height - 5 * age - 161)
+
+
+# ---------------------------------------------------------
+# 4. Profile & Medical Analysis
+# ---------------------------------------------------------
+st.markdown(f"### {t['profile_header']}")
+
+with st.expander(t["profile_expander"], expanded=True):
     col_p1, col_p2, col_p3, col_p4 = st.columns(4)
 
     with col_p1:
-        age = st.number_input("العمر (سنة):", min_value=10, max_value=100, value=30)
+        age = st.number_input(t["age"], min_value=10, max_value=100, value=30)
     with col_p2:
-        gender = st.selectbox("الجنس:", ["ذكر", "أنثى"])
+        gender = st.selectbox(t["gender"], t["gender_opts"])
     with col_p3:
         weight = st.number_input(
-            "الوزن (كجم):", min_value=30.0, max_value=250.0, value=75.0, step=0.5
+            t["weight"], min_value=30.0, max_value=250.0, value=75.0, step=0.5
         )
     with col_p4:
         height = st.number_input(
-            "الطول (سم):", min_value=100.0, max_value=230.0, value=175.0, step=0.5
+            t["height"], min_value=100.0, max_value=230.0, value=175.0, step=0.5
         )
 
     col_p5, col_p6 = st.columns(2)
     with col_p5:
-        activity_level = st.selectbox(
-            "مستوى النشاط البدني:",
-            [
-                "خامل (مكتب/بدون تمارين)",
-                "نشاط خفيف (تمارين 1-3 أيام/أسبوع)",
-                "نشاط متوسط (تمارين 3-5 أيام/أسبوع)",
-                "نشاط عالٍ (تمارين شاقة يومياً)",
-            ],
-        )
+        activity_level = st.selectbox(t["activity"], t["activity_opts"])
     with col_p6:
         medical_conditions = st.multiselect(
-            "الأمراض والحالات الصحية المشخصة (إن وجدت):",
-            [
-                "السكري (Type 2 / Type 1)",
-                "ضغط الدم المرتفع",
-                "خمول الغدة الدرقية",
-                "تكيس المبايض (PCOS)",
-                "ارتفاع الكوليسترول / الدهون الثلاثية",
-                "مقاومة الانسولين",
-                "الكبد الدهني",
-                "لا توجد أمراض مزمنة",
-            ],
+            t["conditions"], t["conditions_opts"]
         )
 
     st.markdown("---")
-    st.markdown("##### 📄 تحميل تقرير طبي / تحاليل دم (اختياري للتحليل الذكي)")
+    st.markdown(f"##### {t['upload_report']}")
     uploaded_report = st.file_uploader(
-        "ارفع صورة التقرير الطبي أو صورة التحليل (CBC, Lipid Profile, Thyroid, HBA1c):",
+        "Upload image / ارفع صورة التقرير:",
         type=["jpg", "jpeg", "png"],
         key="medical_report",
     )
 
-    # حساب السعرات الحرارية التلقائي بناءً على المعادلات المقبولة طبياً
     base_bmr = calculate_bmr(weight, height, age, gender)
-    activity_multipliers = {
-        "خامل (مكتب/بدون تمارين)": 1.2,
-        "نشاط خفيف (تمارين 1-3 أيام/أسبوع)": 1.375,
-        "نشاط متوسط (تمارين 3-5 أيام/أسبوع)": 1.55,
-        "نشاط عالٍ (تمارين شاقة يومياً)": 1.725,
-    }
-    calculated_tdee = int(base_bmr * activity_multipliers[activity_level])
+    act_index = t["activity_opts"].index(activity_level)
+    multipliers = [1.2, 1.375, 1.55, 1.725]
+    calculated_tdee = int(base_bmr * multipliers[act_index])
 
-    # تحليلات التقارير الطبية وتراكم الدهون بالذكاء الاصطناعي
-    if uploaded_report is not None and st.button(
-        "تحليل التقرير الطبي وتوليد التوصيات الصحية 🧬"
-    ):
+    if uploaded_report is not None and st.button(t["btn_analyze_report"]):
         if not api_key:
-            st.error("⚠️ يرجى إدخال OpenRouter API Key في الشريط الجانبي أولاً!")
+            st.error("API Key Required!")
         else:
-            with st.spinner("جاري فحص التقرير الطبي وتحليل المؤشرات الحيوية... ⚡"):
+            with st.spinner("Processing report... ⚡"):
                 try:
                     rep_img = Image.open(uploaded_report)
-                    opt_rep_img = optimize_image(rep_img)
-                    base64_rep = encode_image_to_base64(opt_rep_img)
+                    opt_rep = optimize_image(rep_img)
+                    b64_rep = encode_image_to_base64(opt_rep)
+
+                    lang_instruction = (
+                        "أجب باللغة العربية حصراً وبصيغة من اليمين إلى اليسار."
+                        if is_ar
+                        else (
+                            "Respond strictly in English formatted LTR (Left to"
+                            " Right)."
+                        )
+                    )
 
                     report_prompt = f"""
-                    أنت طبيب واستشاري تغذية علاجية ومتخصص في تحليل الفحوصات والتقارير الطبية.
-                    بيانات المريض الأساسية:
-                    - العمر: {age} | الجنس: {gender} | الوزن: {weight} كجم | الطول: {height} سم
-                    - الحالات التشخيصية المحددة: {', '.join(medical_conditions) if medical_conditions else 'لا يوجد'}
+                    [Instruction: {lang_instruction}]
+                    You are a clinical nutritionist and medical diagnostics expert.
+                    Patient context:
+                    - Age: {age} | Gender: {gender} | Weight: {weight}kg | Height: {height}cm
+                    - Diagnosed Conditions: {', '.join(medical_conditions) if medical_conditions else 'None'}
+                    - Calculated TDEE: {calculated_tdee} Kcal
 
-                    افحص الصورة المرفقة (التقرير الطبي / التحليل) بتمعن واكتب تقريراً طليقاً ومباشراً يحتوي على:
-                    1. **ملخص نتائج التقرير الطبي:** (قراءة المؤشرات المرتفعة أو المنخفضة وأسبابها).
-                    2. **توزيع وتركز الدهون المتوقع في الجسم:** (حدد أين تتركز الدهون غالبًا بناءً على حالة المريض، هل هي دهون أحشاء بطنية Visceral Fat، أم دهون محيطية أسفل الجسم، ومدى ارتباطها بهرمونات مثل الأنسولين/الكورتيزول).
-                    3. **السعرات الحرارية والماكروز الموصى بها طبياً:** (استناداً إلى احتياج {calculated_tdee} سعرة، حدد ما إذا كان يجب تقليل السعرات والتوزيع المناسب للبروتين والدهون الصحية والنشويات).
-                    4. **محاذير وتوصيات غذائية حازمة:** (أطعمة ممنوعة تماماً لحالته وأطعمة موصى بها).
+                    Analyze the attached medical report image carefully and output the following sections:
+                    1. **Medical Report Findings Summary:** (Key elevated/low biomarkers and interpretation).
+                    2. **Expected Fat Accumulation Pattern:** (Identify visceral vs subcutaneous fat distribution, hormone correlations e.g., Insulin/Cortisol).
+                    3. **Medically Tailored Daily Caloric & Macro Plan:** (Macro breakdown based on {calculated_tdee} Kcal target).
+                    4. **Strict Dietary Guidelines & Restrictions:** (Allowed vs Prohibited foods).
                     """
 
                     headers = {
@@ -295,7 +377,7 @@ with st.expander(
                                 {
                                     "type": "image_url",
                                     "image_url": {
-                                        "url": f"data:image/jpeg;base64,{base64_rep}"
+                                        "url": f"data:image/jpeg;base64,{b64_rep}"
                                     },
                                 },
                             ],
@@ -313,21 +395,19 @@ with st.expander(
                         st.session_state.medical_report_analysis = res.json()[
                             "choices"
                         ][0]["message"]["content"]
-                        st.success("✅ تم تحليل التقرير الطبي بنجاح!")
+                        st.success("Analysis Complete!" if not is_ar else "تم التحليل بنجاح!")
                     else:
-                        st.error(f"حدث خطأ أثناء تحليل التقرير: {res.text}")
+                        st.error(f"Error: {res.text}")
                 except Exception as e:
-                    st.error(f"خطأ في الاتصال: {e}")
+                    st.error(f"Connection Error: {e}")
 
-# عرض نتائج التقرير الطبي إذا كانت متوفرة
 if st.session_state.medical_report_analysis:
-    st.info("🩺 **نتائج التحليل الطبي وتوزيع الدهون وتوصيات السعرات:**")
-    st.markdown(st.session_state.medical_report_analysis)
+    st.info(st.session_state.medical_report_analysis)
 
 st.markdown("---")
 
 # ---------------------------------------------------------
-# 6. Dashboard Metrics & Fasting Timer
+# 5. Dashboard Metrics & Fasting Timer
 # ---------------------------------------------------------
 daily_target = calculated_tdee
 consumed_calories = sum(
@@ -335,28 +415,27 @@ consumed_calories = sum(
 )
 remaining_calories = daily_target - consumed_calories
 
-st.markdown("### 📊 الميزانية اليومية للوجبات والسعرات")
+st.markdown(f"### {t['dashboard_header']}")
 metric_c1, metric_c2, metric_c3, metric_c4 = st.columns(4)
 
-metric_c1.metric("المعدل الأيضي الأساسي (BMR)", f"{base_bmr} Kcal")
-metric_c2.metric("الاحتياج اليومي المستهدف", f"{daily_target} Kcal")
-metric_c3.metric("المستهلك حتى الآن", f"{consumed_calories} Kcal")
+metric_c1.metric(t["bmr"], f"{base_bmr} Kcal")
+metric_c2.metric(t["target"], f"{daily_target} Kcal")
+metric_c3.metric(t["consumed"], f"{consumed_calories} Kcal")
 
 if remaining_calories >= 0:
     metric_c4.metric(
-        "المتبقي اليوم",
+        t["remaining"],
         f"{remaining_calories} Kcal",
         delta=f"{remaining_calories} Kcal",
     )
 else:
     metric_c4.metric(
-        "تجاوزت الحد بـ",
+        t["over_limit"],
         f"{abs(remaining_calories)} Kcal",
         delta=f"-{abs(remaining_calories)} Kcal",
         delta_color="inverse",
     )
 
-# عداد الصيام المتقطع
 if st.session_state.fast_start_time:
     elapsed_time = datetime.now() - st.session_state.fast_start_time
     required_hours = timedelta(hours=fasting_plan)
@@ -366,31 +445,36 @@ if st.session_state.fast_start_time:
         hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
         minutes, seconds = divmod(remainder, 60)
         st.warning(
-            f"⏳ أنت الآن في فترة صيام متقطع ({fasting_plan} ساعة). الوقت"
-            f" المتبقي: {hours:02d}:{minutes:02d}:{seconds:02d}"
+            f"⏳ Fasting Active ({fasting_plan}h). Remaining:"
+            f" {hours:02d}:{minutes:02d}:{seconds:02d}"
+            if not is_ar
+            else f"⏳ فترة الصيام المتقطع نشطة ({fasting_plan} ساعة). المتبقي:"
+            f" {hours:02d}:{minutes:02d}:{seconds:02d}"
         )
     else:
-        st.success("🎉 تهانينا! أكملت فترة الصيام المتقطع بنجاح.")
+        st.success(
+            "🎉 Fasting Period Complete!"
+            if not is_ar
+            else "🎉 انتهت فترة الصيام المتقطع!"
+        )
 
 st.markdown("---")
 
 # ---------------------------------------------------------
-# 7. Meal Image Acquisition & Vision Analysis Engine
+# 6. AI Meal Vision Scanner
 # ---------------------------------------------------------
-st.markdown("### 📸 فحص الوجبات عبر كاميرا الذكاء الاصطناعي")
+st.markdown(f"### {t['meal_header']}")
 
 input_method = st.radio(
-    "اختر طريقة إدخال صورة الوجبة:",
-    ["📷 الكاميرا المباشرة", "🖼️ رفع صورة من المعرض / الجهاز"],
-    horizontal=True,
+    t["input_method"], t["source_opts"], horizontal=True
 )
 
 uploaded_meal_img = None
-if input_method == "📷 الكاميرا المباشرة":
-    uploaded_meal_img = st.camera_input("التقط صورة للوجبة مباشرة:")
+if input_method == t["source_opts"][0]:
+    uploaded_meal_img = st.camera_input("Capture meal / التقط صورة:")
 else:
     uploaded_meal_img = st.file_uploader(
-        "اختر صورة الوجبة من الاستوديو:",
+        "Upload image / اختر صورة:",
         type=["jpg", "jpeg", "png"],
         key="meal_upload",
     )
@@ -399,38 +483,47 @@ if uploaded_meal_img is not None:
     raw_img = Image.open(uploaded_meal_img)
     opt_meal_img = optimize_image(raw_img)
 
-    if input_method == "🖼️ رفع صورة من المعرض / الجهاز":
-        st.image(
-            opt_meal_img, caption="الوجبة المراد تحليلها", width=350
-        )
+    if input_method == t["source_opts"][1]:
+        st.image(opt_meal_img, caption="Meal Image", width=350)
 
-    meal_custom_name = st.text_input("اسم الوجبة (اختياري):", value="وجبة مسجلة")
+    meal_custom_name = st.text_input(
+        t["meal_name"], value="وجبة مسجلة" if is_ar else "Recorded Meal"
+    )
 
-    if st.button("تحليل الوجبة وإضافتها للسجل 🔍", type="primary"):
+    if st.button(t["btn_analyze_meal"], type="primary"):
         if not api_key:
-            st.error("⚠️ يرجى إدخال OpenRouter API Key في القائمة الجانبية!")
+            st.error("API Key Required!")
         else:
-            with st.spinner("جاري تحليل الوجبة بصرياً ومطابقتها مع حالتك الصحية... ⚡"):
+            with st.spinner("Analyzing Food... ⚡"):
                 try:
                     b64_meal = encode_image_to_base64(opt_meal_img)
                     meal_data_url = f"data:image/jpeg;base64,{b64_meal}"
 
+                    lang_prompt_instruction = (
+                        "أكتب التقرير والتحليل باللغة العربية حصراً وبصيغة RTL"
+                        if is_ar
+                        else (
+                            "Write the report exclusively in English in LTR"
+                            " layout."
+                        )
+                    )
+
                     meal_prompt = f"""
                     [Req_ID: {time.time()}]
-                    أنت أخصائي تغذية علاجية صارم جداً ومحترف.
-                    سياق المريض الصحي:
-                    - العمر: {age} | الوزن: {weight} كجم | الأمراض المشخصة: {', '.join(medical_conditions) if medical_conditions else 'لا يوجد'}
+                    [Instruction: {lang_prompt_instruction}]
+                    You are a clinical nutrition expert.
+                    Patient Context: Age {age}, Weight {weight}kg, Conditions: {', '.join(medical_conditions) if medical_conditions else 'None'}
 
-                    افحص هذه الصورة بدقة شديدة:
-                    - إذا كانت الصورة تعبر عن ماء أو كوب فارغ/مشروب خالي من السعرات، اجعل الإجمالي 0 سعرة.
-                    - اكتب التقرير بوضوح وفق الهيكل المحدد:
+                    Examine the food/beverage image closely:
+                    - If the image contains pure water or zero-calorie beverage, set estimated calories strictly to 0 Kcal.
+                    - Format the output EXACTLY as follows:
 
-                    الإجمالي التقديري للسعرات: [اكتب الرقم فقط ثم كلمة سعرة، مثال: 0 سعرة أو 450 سعرة]
+                    الإجمالي التقديري للسعرات: [x] سعرة  (or for English: Estimated Total Calories: [x] Kcal)
 
-                    1. **المكونات والسعرات:** (تحديد الأطعمة والمكونات الظاهرة وحساب سعرات كل مكون).
-                    2. **القيم الغذائية:** (البروتين / الكربوهيدرات / الدهون بالجرام).
-                    3. **التأثير الصحي والملاءمة بحسب حالتك:** (هل هذه الوجبة مناسبة لحالته الصحية والأمراض التي يعاني منها وكيف تؤثر على نسبة الدهون والمؤشر الجلايسيمي).
-                    4. **النقد الصارم والحكم النهائي:** (نصيحة صارمة ومباشرة بدون مجاملة في 3 أسطر).
+                    1. **{"المكونات والسعرات" if is_ar else "Ingredients & Calories"}:** (Detailed itemized list).
+                    2. **{"القيم الغذائية" if is_ar else "Nutritional Values"}:** (Protein / Carbs / Fats in grams).
+                    3. **{"التأثير الصحي والملاءمة" if is_ar else "Health Impact & Suitability"}:** (Compatibility with user's medical profile).
+                    4. **{"النقد الصارم والحكم النهائي" if is_ar else "Strict Verdict & Advice"}:** (Direct 3-line expert guidance).
                     """
 
                     headers = {
@@ -467,11 +560,15 @@ if uploaded_meal_img is not None:
                         ]["content"]
 
                         cal_match = re.search(
-                            r"الإجمالي التقديري للسعرات:\s*(\d+)", analysis_text
+                            r"(?:الإجمالي التقديري للسعرات|Estimated Total Calories):\s*(\d+)",
+                            analysis_text,
+                            re.IGNORECASE,
                         )
                         if not cal_match:
                             cal_match = re.search(
-                                r"(\d+)\s*سعرة", analysis_text
+                                r"(\d+)\s*(?:سعرة|Kcal)",
+                                analysis_text,
+                                re.IGNORECASE,
                             )
 
                         extracted_calories = (
@@ -486,26 +583,23 @@ if uploaded_meal_img is not None:
                         })
 
                         st.session_state.latest_analysis = analysis_text
-                        st.success("✅ تم تحليل الوجبة وتسجيلها بنجاح!")
+                        st.success("✅ Success!" if not is_ar else "✅ تم تحليل الوجبة بنجاح!")
                     else:
-                        st.error(
-                            f"فشل الاتصال بـ OpenRouter ({response.status_code}): {response.text}"
-                        )
+                        st.error(f"API Error ({response.status_code}): {response.text}")
 
                 except Exception as e:
-                    st.error(f"حدث خطأ أثناء معالجة الصورة: {e}")
+                    st.error(f"Processing Error: {e}")
 
-# عرض التقرير الأخير للوجبة
 if st.session_state.latest_analysis:
-    st.markdown("#### 📋 تقرير الوجبة الأخيرة:")
+    st.markdown(f"#### {t['latest_report_title']}")
     st.info(st.session_state.latest_analysis)
 
 # ---------------------------------------------------------
-# 8. Daily Log History
+# 7. Today's Meal History Log
 # ---------------------------------------------------------
 if st.session_state.meals_history:
     st.markdown("---")
-    st.markdown("### 📋 سجل الوجبات المسجلة اليوم")
+    st.markdown(f"### {t['history_header']}")
     for idx, meal in enumerate(reversed(st.session_state.meals_history), 1):
         with st.expander(
             f"🍽️ {meal['name']} - {meal['calories']} Kcal ({meal['time']})"
