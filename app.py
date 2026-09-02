@@ -51,6 +51,9 @@ if "meals_history" not in st.session_state:
 if "fast_start_time" not in st.session_state:
     st.session_state.fast_start_time = None
 
+if "latest_analysis" not in st.session_state:
+    st.session_state.latest_analysis = None
+
 # ---------------------------------------------------------
 # 4. Sidebar Options
 # ---------------------------------------------------------
@@ -71,12 +74,11 @@ user_key_input = st.sidebar.text_input(
 
 api_key = user_key_input.strip() if user_key_input else ""
 
-# Tested OpenRouter Vision Models
+# Exact Active OpenRouter Vision Model IDs
 selected_model = st.sidebar.selectbox(
     "اختر نموذج الذكاء الاصطناعي:",
     [
         "google/gemini-2.0-flash-001",
-        "google/gemini-flash-1.5",
         "openai/gpt-4o-mini",
         "anthropic/claude-3.5-sonnet",
     ],
@@ -113,6 +115,7 @@ with col_fast_end:
 st.sidebar.markdown("---")
 if st.sidebar.button("🗑️ إعادة ضبط سجل اليوم"):
     st.session_state.meals_history = []
+    st.session_state.latest_analysis = None
     st.sidebar.success("تم مسح سجل الوجبات اليومي!")
 
 st.sidebar.markdown("---")
@@ -203,29 +206,28 @@ if uploaded_image is not None:
         if not api_key:
             st.error("⚠️ يرجى إدخال OpenRouter API Key في القائمة الجانبية!")
         else:
-            with st.spinner("جاري فحص الصورة وتحليلها بدقة... ⚡"):
+            with st.spinner("جاري فحص الصورة وتحليلها بدقة عبر OpenRouter... ⚡"):
                 try:
                     base64_str = encode_image_to_base64(optimized_img)
                     data_url = f"data:image/jpeg;base64,{base64_str}"
 
-                    # Unique prompt with timestamp to force fresh inference
                     prompt = f"""
-                    [Timestamp: {time.time()}]
-                    انظر إلى هذه الصورة بدقة عالية واشرح ما تراه فقط.
-                    إذا كانت الصورة تحتوي على ماء أو كوب ماء فارغ/مليء، السعرات تكون 0 سعرة.
-                    أنت خبير تغذية صارم جداً. قم بتحليل العنصر في الصورة بدقة واكتب التقرير كالتالي:
+                    [Req_ID: {time.time()}]
+                    قم بتحليل هذه الصورة بدقة شديدة:
+                    1. حدد ما هو العنصر الموجود في الصورة بدقة (إذا كان كوب ماء أو سائل شفاف، السعرات تكون 0 سعرة).
+                    2. قم بالرد بالنسق التالي تماماً:
 
                     الإجمالي التقديري للسعرات: [اكتب الرقم فقط ثم كلمة سعرة، مثال: 0 سعرة]
 
-                    1. **المكونات والسعرات:** (تحديد العنصر المباشر في الصورة بدقة)
-                    2. **القيم الغذائية:** (البروتين/الكربوهيدرات/الدهون)
-                    3. **النقد الصارم والحكم النهائي:** (نصيحة في 3 أسطر).
+                    1. **المكونات والسعرات:** (تحديد المكون الظاهر في الصورة)
+                    2. **القيم الغذائية:** (البروتين / الكربوهيدرات / الدهون)
+                    3. **النقد الصارم والحكم النهائي:** (نصيحة غذائية سريعة في 3 أسطر).
                     """
 
                     headers = {
                         "Authorization": f"Bearer {api_key}",
                         "HTTP-Referer": "https://streamlit.io",
-                        "X-Title": "Fasting Guard Vision",
+                        "X-Title": "Nutrition Guard",
                         "Content-Type": "application/json",
                     }
 
@@ -246,7 +248,7 @@ if uploaded_image is not None:
                     response = requests.post(
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
-                        json=payload,
+                        data=json.dumps(payload),
                         timeout=40,
                     )
 
@@ -268,14 +270,16 @@ if uploaded_image is not None:
                             int(cal_match.group(1)) if cal_match else 0
                         )
 
-                        st.session_state.meals_history.append({
+                        meal_entry = {
                             "time": datetime.now().strftime("%I:%M %p"),
                             "name": meal_name,
                             "calories": extracted_calories,
                             "details": analysis_text,
-                        })
+                        }
 
-                        st.rerun()
+                        st.session_state.meals_history.append(meal_entry)
+                        st.session_state.latest_analysis = analysis_text
+                        st.success("✅ تم التحليل بنجاح!")
                     else:
                         st.error(
                             f"فشل الاتصال بـ OpenRouter ({response.status_code}): {response.text}"
@@ -283,6 +287,12 @@ if uploaded_image is not None:
 
                 except Exception as e:
                     st.error(f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {e}")
+
+# Render latest analysis if available
+if st.session_state.latest_analysis:
+    st.markdown("---")
+    st.markdown("### 📊 التقرير والتحليل الغذائي الأخير:")
+    st.markdown(st.session_state.latest_analysis)
 
 # ---------------------------------------------------------
 # 8. Daily Meals Log
