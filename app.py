@@ -24,62 +24,69 @@ st.caption("Designed by: Mustafa Khalid Jasim")
 # 2. Helper Functions
 # ---------------------------------------------------------
 def optimize_image(img, max_size=800):
-  """Resize and compress image for faster AI vision processing."""
-  img = img.convert("RGB")
-  img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-  return img
+    """Resize and compress image for faster AI vision processing."""
+    img = img.convert("RGB")
+    img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+    return img
 
 
 def encode_image_to_base64(pil_img):
-  """Convert a PIL image to a Base64 string for API payloads."""
-  buffered = io.BytesIO()
-  pil_img.save(buffered, format="JPEG")
-  img_bytes = buffered.getvalue()
-  return base64.b64encode(img_bytes).decode("utf-8")
+    """Convert a PIL image to a Base64 string for API payloads."""
+    buffered = io.BytesIO()
+    pil_img.save(buffered, format="JPEG")
+    img_bytes = buffered.getvalue()
+    return base64.b64encode(img_bytes).decode("utf-8")
 
 
 # ---------------------------------------------------------
 # 3. Session State Initialization
 # ---------------------------------------------------------
 if "daily_target" not in st.session_state:
-  st.session_state.daily_target = 2000
+    st.session_state.daily_target = 2000
 
 if "meals_history" not in st.session_state:
-  st.session_state.meals_history = []
+    st.session_state.meals_history = []
 
 if "fast_start_time" not in st.session_state:
-  st.session_state.fast_start_time = None
+    st.session_state.fast_start_time = None
 
 # ---------------------------------------------------------
 # 4. Sidebar: API Key & Intermittent Fasting Settings
 # ---------------------------------------------------------
-st.sidebar.header("🔑 إعدادات المفتاح (API Key)")
+st.sidebar.header("🔑 إعدادات المفتاح (KiosAPI Key)")
 
-# Read key from Streamlit Secrets or system environment
+# Read key & Base URL from Streamlit Secrets or system environment
 raw_api_key = (
-    st.secrets.get("OPENROUTER_API_KEY")
+    st.secrets.get("KIOS_API_KEY")
+    or st.secrets.get("OPENROUTER_API_KEY")
+    or os.environ.get("KIOS_API_KEY")
     or os.environ.get("OPENROUTER_API_KEY")
     or ""
 )
 
+api_base_url = (
+    st.secrets.get("KIOS_BASE_URL")
+    or os.environ.get("KIOS_BASE_URL")
+    or "https://api.kiosapi.com/v1"
+)
+
 user_key_input = st.sidebar.text_input(
-    "أدخل OpenRouter API Key:",
+    "أدخل KiosAPI Key:",
     value=raw_api_key,
     type="password",
-    help="احصل على المفتاح من https://openrouter.ai/keys",
+    help="أدخل المفتاح الخاص بك ابتداءً بـ sk-",
 )
 
 api_key = user_key_input.strip() if user_key_input else ""
 
-# Optional model selection dropdown
+# Valid Vision Models for KiosAPI
 selected_model = st.sidebar.selectbox(
     "اختر نموذج الذكاء الاصطناعي:",
     [
-        "claude/opus-4-6",
-        "openai/gpt-4o-mini",
-        "anthropic/claude-3.5-sonnet",
-        "meta-llama/llama-3.2-11b-vision-instruct",
-        "google/gemini-2.5-flash",
+        "claude-3-5-sonnet-20241022",
+        "gpt-4o-mini",
+        "gemini-2.5-flash",
+        "llama-3.2-11b-vision-instruct",
     ],
     index=0,
 )
@@ -102,19 +109,19 @@ fasting_plan = st.sidebar.selectbox(
 
 col_fast_start, col_fast_end = st.sidebar.columns(2)
 with col_fast_start:
-  if st.button("بدء الصيام الآن"):
-    st.session_state.fast_start_time = datetime.now()
-    st.success("تم بدء الصيام!")
+    if st.button("بدء الصيام الآن"):
+        st.session_state.fast_start_time = datetime.now()
+        st.success("تم بدء الصيام!")
 
 with col_fast_end:
-  if st.button("إنهاء الصيام"):
-    st.session_state.fast_start_time = None
-    st.warning("تم إنهاء الصيام.")
+    if st.button("إنهاء الصيام"):
+        st.session_state.fast_start_time = None
+        st.warning("تم إنهاء الصيام.")
 
 st.sidebar.markdown("---")
 if st.sidebar.button("🗑️ إعادة ضبط سجل اليوم"):
-  st.session_state.meals_history = []
-  st.sidebar.success("تم مسح سجل الوجبات اليومي!")
+    st.session_state.meals_history = []
+    st.sidebar.success("تم مسح سجل الوجبات اليومي!")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Designed by:**\nMustafa Khalid Jasim")
@@ -133,34 +140,34 @@ metric_col1.metric("الهدف اليومي", f"{st.session_state.daily_target} 
 metric_col2.metric("المستهلك حتى الآن", f"{consumed_calories} سعرة")
 
 if remaining_calories >= 0:
-  metric_col3.metric(
-      "المتبقي لك اليوم",
-      f"{remaining_calories} سعرة",
-      delta=f"{remaining_calories} Kcal",
-  )
+    metric_col3.metric(
+        "المتبقي لك اليوم",
+        f"{remaining_calories} سعرة",
+        delta=f"{remaining_calories} Kcal",
+    )
 else:
-  metric_col3.metric(
-      "تجاوزت الحد بـ",
-      f"{abs(remaining_calories)} سعرة",
-      delta=f"-{abs(remaining_calories)} Kcal",
-      delta_color="inverse",
-  )
+    metric_col3.metric(
+        "تجاوزت الحد بـ",
+        f"{abs(remaining_calories)} سعرة",
+        delta=f"-{abs(remaining_calories)} Kcal",
+        delta_color="inverse",
+    )
 
 # Fasting Timer Display
 if st.session_state.fast_start_time:
-  elapsed_time = datetime.now() - st.session_state.fast_start_time
-  required_hours = timedelta(hours=fasting_plan)
+    elapsed_time = datetime.now() - st.session_state.fast_start_time
+    required_hours = timedelta(hours=fasting_plan)
 
-  if elapsed_time < required_hours:
-    remaining_time = required_hours - elapsed_time
-    hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
-    minutes, seconds = divmod(remainder, 60)
-    st.info(
-        f"⏳ أنت الآن في فترة صيام ({fasting_plan} ساعة). الوقت المتبقي:"
-        f" {hours:02d}:{minutes:02d}:{seconds:02d}"
-    )
-  else:
-    st.success("🎉 انتهت فترة الصيام المتقطع!")
+    if elapsed_time < required_hours:
+        remaining_time = required_hours - elapsed_time
+        hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        st.info(
+            f"⏳ أنت الآن في فترة صيام ({fasting_plan} ساعة). الوقت المتبقي:"
+            f" {hours:02d}:{minutes:02d}:{seconds:02d}"
+        )
+    else:
+        st.success("🎉 انتهت فترة الصيام المتقطع!")
 
 st.markdown("---")
 
@@ -178,43 +185,43 @@ input_method = st.radio(
 uploaded_image = None
 
 if input_method == "📷 الكاميرا المباشرة":
-  uploaded_image = st.camera_input("التقط صورة للوجبة مباشرة:")
+    uploaded_image = st.camera_input("التقط صورة للوجبة مباشرة:")
 else:
-  uploaded_image = st.file_uploader(
-      "اختر صورة الوجبة من الاستوديو:", type=["jpg", "jpeg", "png"]
-  )
-
-# ---------------------------------------------------------
-# 7. AI Analysis Engine (OpenRouter) & Meal Logging
-# ---------------------------------------------------------
-if uploaded_image is not None:
-  raw_image = Image.open(uploaded_image)
-  optimized_img = optimize_image(raw_image)
-
-  if input_method == "🖼️ اختيار من المعرض / الاستوديو":
-    st.image(
-        optimized_img, caption="الوجبة المختارة", use_container_width=True
+    uploaded_image = st.file_uploader(
+        "اختر صورة الوجبة من الاستوديو:", type=["jpg", "jpeg", "png"]
     )
 
-  meal_name = st.text_input(
-      "اسم الوجبة (اختياري للتسجيل):", value="وجبة مسجلة"
-  )
-  analyze_btn = st.button("تحليل الوجبة وإضافتها للسجل 🔍", type="primary")
+# ---------------------------------------------------------
+# 7. AI Analysis Engine (KiosAPI) & Meal Logging
+# ---------------------------------------------------------
+if uploaded_image is not None:
+    raw_image = Image.open(uploaded_image)
+    optimized_img = optimize_image(raw_image)
 
-  if analyze_btn:
-    if not api_key:
-      st.error(
-          "⚠️ يرجى إدخال OpenRouter API Key في القائمة الجانبية أو ضبطه في"
-          " Secrets للبدء!"
-      )
-    else:
-      with st.spinner("جاري التحليل السريع للوجبة عبر OpenRouter... ⚡"):
-        try:
-          # Convert image to base64
-          base64_str = encode_image_to_base64(optimized_img)
-          data_url = f"data:image/jpeg;base64,{base64_str}"
+    if input_method == "🖼️ اختيار من المعرض / الاستوديو":
+        st.image(
+            optimized_img, caption="الوجبة المختارة", use_container_width=True
+        )
 
-          prompt = """
+    meal_name = st.text_input(
+        "اسم الوجبة (اختياري للتسجيل):", value="وجبة مسجلة"
+    )
+    analyze_btn = st.button("تحليل الوجبة وإضافتها للسجل 🔍", type="primary")
+
+    if analyze_btn:
+        if not api_key:
+            st.error(
+                "⚠️ يرجى إدخال API Key في القائمة الجانبية أو ضبطه في"
+                " Secrets للبدء!"
+            )
+        else:
+            with st.spinner("جاري التحليل السريع للوجبة عبر الذكاء الاصطناعي... ⚡"):
+                try:
+                    # Convert image to base64
+                    base64_str = encode_image_to_base64(optimized_img)
+                    data_url = f"data:image/jpeg;base64,{base64_str}"
+
+                    prompt = """
                     أنت خبير تغذية صارم جداً ولا تجامل (Brutally Honest). 
                     قم بتحليل صورة الوجبة المرفقة واكتب التقرير بشكل مختصر ومباشر دون إطالة وفق التالي:
 
@@ -225,78 +232,78 @@ if uploaded_image is not None:
                     3. **النقد الصارم والحكم النهائي:** (مخاطر الوجبة ونصيحة حازمة بدون مجاملة في 3 أسطر فقط).
                     """
 
-          # Prepare OpenRouter payload
-          headers = {
-              "Authorization": f"Bearer {api_key}",
-              "HTTP-Referer": "https://streamlit.io",
-              "X-Title": "Nutrition Guard",
-              "Content-Type": "application/json",
-          }
+                    # Prepare KiosAPI payload & endpoint
+                    headers = {
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    }
 
-          payload = {
-              "model": selected_model,
-              "messages": [{
-                  "role": "user",
-                  "content": [
-                      {"type": "text", "text": prompt},
-                      {"type": "image_url", "image_url": {"url": data_url}},
-                  ],
-              }],
-          }
+                    endpoint_url = f"{api_base_url.rstrip('/')}/chat/completions"
 
-          response = requests.post(
-              "https://openrouter.ai/api/v1/chat/completions",
-              headers=headers,
-              data=json.dumps(payload),
-              timeout=30,
-          )
+                    payload = {
+                        "model": selected_model,
+                        "messages": [{
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {"type": "image_url", "image_url": {"url": data_url}},
+                            ],
+                        }],
+                    }
 
-          if response.status_code == 200:
-            res_json = response.json()
-            analysis_text = res_json["choices"][0]["message"]["content"]
+                    response = requests.post(
+                        endpoint_url,
+                        headers=headers,
+                        data=json.dumps(payload),
+                        timeout=30,
+                    )
 
-            # Safe regex parsing for calories
-            cal_match = re.search(
-                r"الإجمالي التقديري للسعرات:\s*(\d+)", analysis_text
-            )
-            if not cal_match:
-              cal_match = re.search(r"(\d+)\s*سعرة", analysis_text)
+                    if response.status_code == 200:
+                        res_json = response.json()
+                        analysis_text = res_json["choices"][0]["message"]["content"]
 
-            extracted_calories = int(cal_match.group(1)) if cal_match else 0
+                        # Safe regex parsing for calories
+                        cal_match = re.search(
+                            r"الإجمالي التقديري للسعرات:\s*(\d+)", analysis_text
+                        )
+                        if not cal_match:
+                            cal_match = re.search(r"(\d+)\s*سعرة", analysis_text)
 
-            st.session_state.meals_history.append({
-                "time": datetime.now().strftime("%I:%M %p"),
-                "name": meal_name,
-                "calories": extracted_calories,
-                "details": analysis_text,
-            })
+                        extracted_calories = int(cal_match.group(1)) if cal_match else 0
 
-            st.markdown("---")
-            st.markdown("### 📊 التقرير والتحليل الغذائي:")
-            st.markdown(analysis_text)
-            st.success(
-                f"✅ تم التسجيل ورصد {extracted_calories} سعرة حرارية!"
-            )
-          else:
-            st.error(
-                f"فشل الاتصال بالمزود ({response.status_code}):"
-                f" {response.text}"
-            )
+                        st.session_state.meals_history.append({
+                            "time": datetime.now().strftime("%I:%M %p"),
+                            "name": meal_name,
+                            "calories": extracted_calories,
+                            "details": analysis_text,
+                        })
 
-        except Exception as e:
-          st.error(f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {e}")
+                        st.markdown("---")
+                        st.markdown("### 📊 التقرير والتحليل الغذائي:")
+                        st.markdown(analysis_text)
+                        st.success(
+                            f"✅ تم التسجيل ورصد {extracted_calories} سعرة حرارية!"
+                        )
+                    else:
+                        st.error(
+                            f"فشل الاتصال بالمزود ({response.status_code}):"
+                            f" {response.text}"
+                        )
+
+                except Exception as e:
+                    st.error(f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {e}")
 
 # ---------------------------------------------------------
 # 8. Daily Meals Log
 # ---------------------------------------------------------
 if st.session_state.meals_history:
-  st.markdown("---")
-  st.subheader("📋 سجل الوجبات اليومية")
-  for idx, meal in enumerate(reversed(st.session_state.meals_history), 1):
-    with st.expander(
-        f"🍽️ {meal['name']} - {meal['calories']} سعرة ({meal['time']})"
-    ):
-      st.markdown(meal["details"])
+    st.markdown("---")
+    st.subheader("📋 سجل الوجبات اليومية")
+    for idx, meal in enumerate(reversed(st.session_state.meals_history), 1):
+        with st.expander(
+            f"🍽️ {meal['name']} - {meal['calories']} سعرة ({meal['time']})"
+        ):
+            st.markdown(meal["details"])
 
 # ---------------------------------------------------------
 # 9. Footer
