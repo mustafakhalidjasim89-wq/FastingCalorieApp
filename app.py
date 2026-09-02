@@ -84,11 +84,9 @@ api_key = user_key_input.strip() if user_key_input else ""
 selected_model = st.sidebar.selectbox(
     "اختر نموذج الذكاء الاصطناعي:",
     [
-        "claude-3-5-sonnet-20240620",
-        "claude-3-haiku-20240307",
-        "claude-3-opus-20240229",
         "gpt-4o-mini",
         "gemini-1.5-flash",
+        "gpt-4o",
     ],
     index=0,
 )
