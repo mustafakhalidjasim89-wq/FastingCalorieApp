@@ -64,7 +64,6 @@ raw_api_key = (
     or ""
 )
 
-# Correct endpoint host for KiosAPI
 api_base_url = (
     st.secrets.get("KIOS_BASE_URL")
     or os.environ.get("KIOS_BASE_URL")
@@ -80,13 +79,13 @@ user_key_input = st.sidebar.text_input(
 
 api_key = user_key_input.strip() if user_key_input else ""
 
-# Valid Vision Models for KiosAPI
+# Universal Vision Models supported across KiosAPI channels
 selected_model = st.sidebar.selectbox(
     "اختر نموذج الذكاء الاصطناعي:",
     [
         "gpt-4o-mini",
+        "claude-3-5-sonnet",
         "gemini-1.5-flash",
-        "gpt-4o",
     ],
     index=0,
 )
@@ -192,7 +191,7 @@ else:
     )
 
 # ---------------------------------------------------------
-# 7. AI Analysis Engine (KiosAPI) & Meal Logging
+# 7. AI Analysis Engine & Meal Logging
 # ---------------------------------------------------------
 if uploaded_image is not None:
     raw_image = Image.open(uploaded_image)
@@ -211,13 +210,11 @@ if uploaded_image is not None:
     if analyze_btn:
         if not api_key:
             st.error(
-                "⚠️ يرجى إدخال API Key في القائمة الجانبية أو ضبطه في"
-                " Secrets للبدء!"
+                "⚠️ يرجى إدخال API Key في القائمة الجانبية أو ضبطه في Secrets للبدء!"
             )
         else:
             with st.spinner("جاري التحليل السريع للوجبة عبر الذكاء الاصطناعي... ⚡"):
                 try:
-                    # Convert image to base64
                     base64_str = encode_image_to_base64(optimized_img)
                     data_url = f"data:image/jpeg;base64,{base64_str}"
 
@@ -232,7 +229,6 @@ if uploaded_image is not None:
                     3. **النقد الصارم والحكم النهائي:** (مخاطر الوجبة ونصيحة حازمة بدون مجاملة في 3 أسطر فقط).
                     """
 
-                    # Prepare KiosAPI payload & endpoint
                     headers = {
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
@@ -255,14 +251,13 @@ if uploaded_image is not None:
                         endpoint_url,
                         headers=headers,
                         data=json.dumps(payload),
-                        timeout=30,
+                        timeout=35,
                     )
 
                     if response.status_code == 200:
                         res_json = response.json()
                         analysis_text = res_json["choices"][0]["message"]["content"]
 
-                        # Safe regex parsing for calories
                         cal_match = re.search(
                             r"الإجمالي التقديري للسعرات:\s*(\d+)", analysis_text
                         )
@@ -286,8 +281,8 @@ if uploaded_image is not None:
                         )
                     else:
                         st.error(
-                            f"فشل الاتصال بالمزود ({response.status_code}):"
-                            f" {response.text}"
+                            f"فشل الاتصال بالمزود ({response.status_code}): {response.text}\n\n"
+                            "⚠️ **تنبيه:** تأكد من تغيير مجموعة (Group) المفتاح في كيو إس آي من `China-Models` إلى `Claude-Kiro` أو `default` ثم حفظ التغيرات."
                         )
 
                 except Exception as e:
@@ -310,7 +305,6 @@ if st.session_state.meals_history:
 # ---------------------------------------------------------
 st.markdown("---")
 st.markdown(
-    "<div style='text-align: center; color: gray;'>Designed by: Mustafa Khalid"
-    " Jasim</div>",
+    "<div style='text-align: center; color: gray;'>Designed by: Mustafa Khalid Jasim</div>",
     unsafe_allow_html=True,
 )
