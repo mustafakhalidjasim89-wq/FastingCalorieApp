@@ -75,6 +75,7 @@ api_key = user_key_input.strip() if user_key_input else ""
 selected_model = st.sidebar.selectbox(
     "اختر نموذج الذكاء الاصطناعي:",
     [
+        "claude/opus-4-6",
         "openai/gpt-4o-mini",
         "anthropic/claude-3.5-sonnet",
         "meta-llama/llama-3.2-11b-vision-instruct",
