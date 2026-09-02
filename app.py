@@ -64,10 +64,11 @@ raw_api_key = (
     or ""
 )
 
+# Correct endpoint host for KiosAPI
 api_base_url = (
     st.secrets.get("KIOS_BASE_URL")
     or os.environ.get("KIOS_BASE_URL")
-    or "https://api.kiosapi.com/v1"
+    or "https://kiosapi.com/v1"
 )
 
 user_key_input = st.sidebar.text_input(
